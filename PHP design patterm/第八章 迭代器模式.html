@@ -1,0 +1,944 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第八章 The Iterator Pattern —— 迭代器模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第八章 The Iterator Pattern —— 迭代器模式</h2>
+
+<p class="docText">面向对象编程把应用逻辑封装在类中。类，依次，被实例化为对象，而且每个单独的对象都有一个截然不同的身份和状态。单独的对象对于组织你的代码是一个有用的方法，但是经常，你需要与一群对象，或一个集合打交道。来自一个 SQL 查询的一系列记录行是一个集合，本书前面介绍的那个 <tt>Monopoly</tt> 游戏例子中的 <tt>Property</tt> 对象列表也是。</p>
+
+<p class="docText">集合也不一定非得是同类的。除了别的以外，图形用户界面框架中的 <tt>Window</tt> 还可以包含许多控件对象 —— <tt>Menu</tt>、<tt>Slider</tt> 以及 <tt>Button</tt>。而且，集合的实现也可以变化多样：PHP 数组是一个集合，但哈希表、链接表、堆栈和队列也都是。</p>
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">如何才能方便地操纵任意的对象集合呢？</p>
+
+
+<h3 class="docSection1Title">解决方案</h3>
+
+<p class="docText">使用 Iterator 模式对集合内容进行统一访问。</p>
+
+<p class="docText">你可能没有意识到，但其实你每天都在使用 Iterator 模式 —— 它就潜藏在 PHP 的数组类型和大量的数组操作函数中。(的确，有了语言中内置的数组类型，以及许多灵活的被设计来处理这个内置类型的函数，你需要一个令人信服的，不用数组来操纵对象集合的理由)</p>
+
+<p class="docText">下面就是 PHP 内置的数组迭代：</p>
+
+<pre>
+$test = array('one', 'two', 'three');
+$output = '';
+<span class="docEmphStrong">reset($test);</span>
+<span class="docEmphStrong">do {
+  $output .= current($test);
+} while (next($test));</span>
+
+echo $output; // 产生 'onetwothree'
+</pre>
+
+<p class="docText"><tt>reset()</tt> 函数把迭代重新转到数组的起始位置；<tt>current()</tt> 返回当前元素的值；而 <tt>next()</tt> 则前进到数组中的下一个元素并返回新的 <tt>current()</tt> 值。当超出了数组的末尾，<tt>next()</tt> 就会返回 <tt>false</tt>。利用这些迭代函数，PHP 数组的内部实现就与你无关了。</p>
+
+<p class="docText">Iterator 结合了面向对象编程的封装和多态性原则。使用 Iterator，你可以操纵集合中的对象，而不需要明确地知道集合是如何实现的，或集合包含什么(什么类型的对象)。Iterator 给不同的具体迭代实现方式提供了一个统一的接口，它完全包含了如何操纵一个特定集合细节，包括显示哪些项目(过滤)和以什么顺序显示(排序)。</p>
+
+<p class="docText">让我们创建一个简单的，用于在一个集合中操纵的对象。(虽然这个例子在 PHP5 中，但 Iterator 不是 PHP5 所唯一的，而且本章的许多例子在 PHP4 中也能工作，虽然那样会增加大量的引用操作符)。<tt>Lendable</tt> 对象表示诸如电影和音乐专辑等媒体，而且确定为一个 web 站点或服务的组成部分，允许用户浏览或与其他用户分享他们的媒体收藏。(对于这个例子，无需考虑持久性等等。)</p>
+
+<p class="docText">我们从下面的测试开始，作为 <tt>Lendable</tt> 设计的基础。</p>
+
+<pre>
+// PHP5
+class LendableTestCase extends UnitTestCase {
+  function TestCheckout() {
+    $item = new Lendable;
+    $this-&gt;assertFalse($item-&gt;borrower);
+    $item-&gt;checkout('John');
+    $this-&gt;assertEqual('borrowed', $item-&gt;status);
+    $this-&gt;assertEqual('John', $item-&gt;borrower);
+  }
+
+  function TestCheckin() {
+    $item = new Lendable;
+    $item-&gt;checkout('John');
+    $item-&gt;checkin();
+    $this-&gt;assertEqual('library', $item-&gt;status);
+    $this-&gt;assertFalse($item-&gt;borrower);
+  }
+}
+</pre>
+
+<p class="docText">为了实现这个初始测试的需求，我们创建一个类，它包含一些 <tt>public</tt> 属性和一些用于切换这些属性值的方法。</p>
+
+<pre>
+class Lendable {
+  public $status = 'library';
+  public $borrower = '';
+
+  public function checkout($borrower) {
+    $this-&gt;status = 'borrowed';
+    $this-&gt;borrower = $borrower;
+  }
+
+  public function checkin() {
+    $this-&gt;status = 'library';
+    $this-&gt;borrower = '';
+  }
+}
+</pre>
+
+<p class="docText"><tt>Lendable</tt> 是一个既好又普通的开始。我们扩展它来跟踪 <tt>DVDs</tt> 或 <tt>CDs</tt> 之类的物品。</p>
+
+<p class="docText"><tt>Media</tt> 扩展了 <tt>Lendable</tt>，并跟踪有关特定媒体的细节，包括它们的名称，发布的年份，以及是什么类型：</p>
+
+<pre>
+class Media extends Lendable {
+  public $name;
+  public $type;
+  public $year;
+
+  public function __construct($name,
+                              $year,
+                              $type = 'dvd') {
+    $this-&gt;name = $name;
+    $this-&gt;type = $type;
+    $this-&gt;year = (int)$year;
+  }
+}
+</pre>
+
+<p class="docText">简单起见，<tt>Media</tt> 使用了三个 <tt>public</tt> 实例变量，<tt>Media::name</tt>、<tt>Media::year</tt> 和 <tt>Media::type</tt>。构造函数接受两个参数，把第一个存入 <tt>$name</tt>，第二个存入 <tt>$year</tt>。构造函数还允许一个可选的第三个参数以指定类型(其默认值为“<tt>DVD</tt>”)。</p>
+
+<p class="docText">有了用于操作的单独的对象，你现在可以创建一个容器来容纳它们：<tt>Library</tt>。就像一个普通的图书馆那样，<tt>Library</tt> 应该能够添加、删除并计算集合中的项目。最后，<tt>Library</tt> 还应该允许访问集合中单独的项目(对象)(本章范例代码部分即将显示)。</p>
+
+<p class="docText">现在，让我们来为 <tt>Library</tt> 建立一个测试用例。</p>
+
+<pre>
+class LibraryTestCase extends UnitTestCase {
+  function TestCount() {
+    $lib = new Library;
+    $this-&gt;assertEqual(0, $lib-&gt;count());
+  }
+}
+</pre>
+
+<p class="docText">编写一个满足这个测试的类非常简单：</p>
+
+<pre>
+class Library {
+  function count() {
+    return 0;
+  }
+}
+</pre>
+
+<p class="docText">让我们继续给这个测试增加一些有趣的功能：</p>
+
+<pre>
+class LibraryTestCase extends UnitTestCase {
+  function TestCount() { /* ... */ }
+
+  <span class="docEmphStrong">function TestAdd() {
+    $lib = new Library;
+    $lib-&gt;add('one');
+    $this-&gt;assertEqual(1, $lib-&gt;count());
+  }</span>
+}
+</pre>
+
+<p class="docText">实现 <tt>add()</tt> 的一个简单的方法是利用 PHP 的灵活的数组函数：你可以把项目添加到一个数组实例变量，然后使用 <tt>count()</tt> 来返回集合中的项目数。</p>
+
+<pre>
+class Library {
+  <span class="docEmphStrong">protected $collection = array();</span>
+
+  function count() {
+    return count($this-&gt;collection);
+  }
+
+  <span class="docEmphStrong">function add($item) {
+    $this-&gt;collection[] = $item;
+  }</span>
+}
+</pre>
+
+<p class="docText">现在，<tt>Libaray</tt> 是一个集合了，但它并没有提供检索或操纵集合的单独成员的方法。</p>
+
+<p class="docText">让我们回到本章的目的，Iterator 设计模式的实现。</p>
+
+<p class="docText">下列的 UML 类图展示了 GoF Iterator 设计模式，它使用了 <tt>Media</tt> 和 <tt>Libaray</tt> 类来让例子更加具体。</p>
+
+<ul class="docList">
+
+<li><p class="docText">你的集合类必须提供一个 Factory(见第 3 章) 来创建你的 Iterator 实例。</p></li>
+
+<li><p class="docText">Iterator 类定义了一个 <tt>first()</tt> 接口来转到集合的起始位置，<tt>next()</tt> 在迭代时顺次移动到下一个项目，<tt>currentItem()</tt> 在迭代时从集合中取回当前项目，而 <tt>isDone()</tt> 则指出你已经迭代完了整个集合。</p></li>
+
+</ul>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch08sec02No.01.gif" /></center></p>
+
+
+<p class="docText">在“范例代码”部分，<tt>LibarayGofIterator</tt> 类就是一个 GoF Iterator 设计模式的直接实现。</p>
+
+
+<h3 class="docSection1Title">范例代码</h3>
+
+<p class="docText">在 <tt>Library</tt> 内实现 GoF Iterator 设计模式的第一步是为新的具体 Iterator 编写一个新的测试用例。既然每个测试方法都要操纵一个填充了 <tt>Media</tt> 实例的 <tt>Library</tt>, 你可以利用 <tt>UnitTestCase::setUp()</tt>，用一个已知状态的 <tt>Library</tt>，为每个测试产生一个变量。</p>
+
+<p class="docText">首先，增加一个 <tt>Library::getIterator()</tt> 方法，把它作为 <tt>LibraryGofIterator</tt> 类实例的一个 Factory。</p>
+
+<pre>
+class IteratorTestCase extends UnitTestCase {
+  protected $lib;
+
+  function setup() {
+    $this-&gt;lib = new Library;
+    $this-&gt;lib-&gt;add(new Media('name1', 2000));
+    $this-&gt;lib-&gt;add(new Media('name2', 2002));
+    $this-&gt;lib-&gt;add(new Media('name3', 2001));
+  }
+
+  function TestGetGofIterator() {
+    $this-&gt;assertIsA($it = $this-&gt;lib-&gt;getIterator(),
+                     'LibraryGofIterator');
+  }
+}
+</pre>
+
+<p class="docText">下面就是这个方法的实现：</p>
+
+<pre>
+class Library {
+  // ...
+
+  function getIterator() {
+    return new LibraryGofIterator($this-&gt;collection);
+  }
+}
+</pre>
+
+<p class="docText"><tt>getIterator()</tt> 方法把 <tt>Library</tt> 的 <tt>$collection</tt> 传递给新的具体迭代器的构造函数。这种技术有两点重要含意：每个迭代器都是独立的，因此可以同时操作多个迭代器。另外，当迭代器被请求时，迭代器才操作集合。如果之后将另一个项目增加到集合，你必须请求另外的迭代器来显示它(至少在这个实现中是这样)。</p>
+
+<p class="docText">通过为 <tt>TestGetGofIterator()</tt> 方法增加断言，我们继续加强测试程序集，以匹配 Iterator 设计模式。如果你已经遍历完了整个集合，<tt>isDone()</tt> 方法只应该在后才返回 <tt>true</tt>。如果迭代器刚建立，则 <tt>isDone()</tt> 显然应该返回 <tt>false</tt>，从而指出集合是可以遍历的。</p>
+
+<pre>
+class IteratorTestCase extends UnitTestCase {
+  function setup() { /* ... */ }
+
+  function TestGetGofIterator() {
+    $this-&gt;assertIsA($it = $this-&gt;lib-&gt;getIterator(),
+                    'LibraryGofIterator');
+    $this-&gt;assertFalse($it-&gt;isdone());
+  }
+}
+</pre>
+
+<p class="docText">按照 TDD 惯例，尽可能实现最简单的代码来满足你的测试用例：</p>
+
+<pre>
+class LibraryGofIterator {
+  function isDone() {
+    return false;
+  }
+}
+</pre>
+
+<p class="docText">那么，在第一次迭代期间应该发生什么呢？<tt>currentItem()</tt> 应该返回在 <tt>IteratorTestCase::setUp()</tt> 方法中添加的第一个 <tt>Media</tt> 对象，而且 <tt>isDone()</tt> 应该继续保持 <tt>false</tt>，因为还有另外两个项目留待迭代。</p>
+
+<pre>
+class IteratorTestCase extends UnitTestCase {
+  function setup() { /* ... */ }
+
+  function TestGetGofIterator() {
+    $this-&gt;assertIsA($it = $this-&gt;lib-&gt;getIterator(),
+                     'LibraryGofIterator');
+    $this-&gt;assertFalse($it-&gt;isdone());
+    <span class="docEmphStrong">$this-&gt;assertIsA($first = $it-&gt;currentItem(), 'Media');</span>
+    <span class="docEmphStrong">$this-&gt;assertEqual('name1', $first-&gt;name);</span>
+    <span class="docEmphStrong">$this-&gt;assertFalse($it-&gt;isdone());</span>
+  }
+}
+</pre>
+
+<p class="docText"><tt>LibraryGofIterator</tt> 在构造函数中接收 <tt>$collection</tt>(见上面的 <tt>Library</tt> 的最小化实现)，并从 <tt>currentItem()</tt> 方法返回那个数组的 <tt>current()</tt> 项目，这一点是很重要的。</p>
+
+<pre>
+class LibraryGofIterator {
+  <span class="docEmphStrong">protected $collection;</span>
+
+  <span class="docEmphStrong">function __construct($collection) {
+    $this-&gt;collection = $collection;
+  }</span>
+
+  <span class="docEmphStrong">function currentItem() {
+    return current($this-&gt;collection);
+  }</span>
+
+  function isDone() {
+    return false;
+  }
+}
+</pre>
+
+<p class="docText">在下一次迭代中又应该发生什么呢？<tt>next()</tt> 方法应该改变 <tt>currentItem()</tt> 返回的项目。下面的测试说明了预期的行为。</p>
+
+<pre>
+class IteratorTestCase extends UnitTestCase {
+  function setup() { /* ... */ }
+
+  function TestGetGofIterator() {
+    $this-&gt;assertIsA($it = $this-&gt;lib-&gt;getIterator(),
+                    'LibraryGofIterator');
+    $this-&gt;assertFalse($it-&gt;isdone());
+    $this-&gt;assertIsA($first = $it-&gt;currentItem(), 'Media');
+    $this-&gt;assertEqual('name1', $first-&gt;name);
+    $this-&gt;assertFalse($it-&gt;isdone());
+
+    <span class="docEmphStrong">$this-&gt;assertTrue($it-&gt;next());</span>
+    <span class="docEmphStrong">$this-&gt;assertIsA($second = $it-&gt;currentItem(), 'Media');</span>
+    <span class="docEmphStrong">$this-&gt;assertEqual('name2', $second-&gt;name);</span>
+    <span class="docEmphStrong">$this-&gt;assertFalse($it-&gt;isdone());</span>
+  }
+}
+</pre>
+
+<p class="docText">再次利用 PHP 的数组函数，在数组上使用 <tt>next()</tt>。</p>
+
+<pre>
+class LibraryGofIterator {
+  protected $collection;
+
+  function __construct($collection) {
+    $this-&gt;collection = $collection;
+  }
+
+  function currentItem() {
+    return current($this-&gt;collection);
+  }
+
+  <span class="docEmphStrong">function next() {
+    return next($this-&gt;collection);
+  }</span>
+
+  function isDone() {
+    return false;
+  }
+}
+</pre>
+
+<p class="docText">除了 <tt>isDone()</tt> 方法必须返回 <tt>true</tt> 以外，第三次迭代看起来与其它两次很像。而且你还希望 <tt>next()</tt> 能够成功移到下一次迭代。</p>
+
+<pre>
+class IteratorTestCase extends UnitTestCase {
+  function setup() { /* ... */ }
+
+  function TestGetGofIterator() {
+    $this-&gt;assertIsA($it = $this-&gt;lib-&gt;getIterator(),
+                     'LibraryGofIterator');
+    $this-&gt;assertFalse($it-&gt;isdone());
+    $this-&gt;assertIsA($first = $it-&gt;currentItem(), 'Media');
+    $this-&gt;assertEqual('name1', $first-&gt;name);
+    $this-&gt;assertFalse($it-&gt;isdone());
+
+    $this-&gt;assertTrue($it-&gt;next());
+    $this-&gt;assertIsA($second = $it-&gt;currentItem(), 'Media');
+    $this-&gt;assertEqual('name2', $second-&gt;name);
+    $this-&gt;assertFalse($it-&gt;isdone());
+
+    <span class="docEmphStrong">$this-&gt;assertTrue($it-&gt;next());</span>
+    <span class="docEmphStrong">$this-&gt;assertIsA($third = $it-&gt;currentItem(), 'Media');</span>
+    <span class="docEmphStrong">$this-&gt;assertEqual('name3', $third-&gt;name);</span>
+    <span class="docEmphStrong">$this-&gt;assertFalse($it-&gt;next());</span>
+    <span class="docEmphStrong">$this-&gt;assertTrue($it-&gt;isdone());</span>
+  }
+}
+</pre>
+
+<p class="docText">通过对 <tt>next()</tt> 和 <tt>isDone()</tt> 稍加修改，所有测试均通过了。现在，代码如下：</p>
+
+<pre>
+class LibraryGofIterator {
+  protected $collection;
+
+  function __construct($collection) {
+    $this-&gt;collection = $collection;
+  }
+
+  function first() {
+    reset($this-&gt;collection);
+  }
+
+  function next() {
+    return (false !== next($this-&gt;collection));
+  }
+
+  function isDone() {
+    return (false === current($this-&gt;collection));
+  }
+
+  function currentItem() {
+    return current($this-&gt;collection);
+  }
+}
+</pre>
+
+<p class="docText">Iterator 测试用例只存在一个问题：它没有反映迭代器的典型用法。是的，它测试了 Iterator 模式的所有功能，但应用程序需要以一种非常简单的方式来使用 Iterator。因此，下一步是使用更加真实的代码来编写一个测试。</p>
+
+<pre>
+class IteratorTestCase extends UnitTestCase {
+  protected $lib;
+
+  function setup() { /* ... */ }
+  function TestGetGofIterator() { /* ... */ }
+<span class="docEmphStrong">
+  function TestGofIteratorUsage() {
+    $output = '';
+    for ($it = $this-&gt;lib-&gt;getIterator(); !$it-&gt;isDone(); $it-&gt;next()) {
+      $output .= $it-&gt;currentItem()-&gt;name;
+    }
+    $this-&gt;assertEqual('name1name2name3', $output);
+  }</span>
+}
+</pre>
+
+<p class="docText">迄今为止。Iterator 的实现方式是拷贝一个数组(集合)，并使用 PHP 内部指针来跟踪迭代。你也可以通过自己跟踪集合索引的方法来实现 Iterator。这需要在 <tt>Library</tt> 中新增一个 accessor 方法，通过键来访问对象。</p>
+
+<pre>
+class Library {
+  // ...
+
+  function get($key) {
+    if (array_key_exists($key, $this-&gt;collection)) {
+      return $this-&gt;collection[$key];
+    }
+  }
+}
+</pre>
+
+<p class="docText">同样，在 <tt>Library::getIterator()</tt> 方法中，你要把 <tt>$this</tt>(<tt>Library</tt> 本身) 传递给构造函数，而非 <tt>$this-&gt;collection</tt>(包含 <tt>Media</tt> 集合的数组)。</p>
+
+<p class="docText">于是，“外部”迭代器仅需要在内部跟踪一个指针，了解当前正在引用的是 <tt>Library</tt> 集合的哪个项目，而且会使用在构造函数中被传递的 <tt>Library</tt> 的引用，调用它的 <tt>get()</tt> 方法来取得当前的对象。</p>
+
+<pre>
+class LibraryGofExternalIterator {
+  protected $key = 0;
+  protected $collection;
+
+  function __construct($collection) {
+    $this-&gt;collection = $collection;
+  }
+
+  function first() {
+    <span class="docEmphStrong">$this-&gt;key = 0;</span>
+  }
+
+  function next() {
+    <span class="docEmphStrong">return (++$this-&gt;key &lt; $this-&gt;collection-&gt;count());</span>
+  }
+
+  function isDone() {
+    <span class="docEmphStrong">return ($this-&gt;key &gt;= $this-&gt;collection-&gt;count());</span>
+  }
+
+  function currentItem() {
+    <span class="docEmphStrong">return $this-&gt;collection-&gt;get($this-&gt;key);</span>
+  }
+}
+</pre>
+
+<p class="docText">这个实现假设你的集合数组从 0 开始建立索引，而且是完全连续的。</p>
+
+
+<h4 class="docSection2Title">A Variant Iterator API(不同的迭代器 API)</h4>
+
+<p class="docText">前面的代码是如 GoF 所述的 Iterator 模式的一个完整实现。不过你可能会觉得四个方法的 API 有一点臃肿。假如是这样的话，你可以通过改进 <tt>next()</tt>，把 <tt>next()</tt>、<tt>currentItem()</tt> 和 <tt>isDone()</tt> 压缩为只有一个 <tt>next()</tt>，然后从集合返回当前项目，或如果整个集合都处理过了，则返回 <tt>false</tt>，</p>
+
+<p class="docText">下面就是为这种 API 变种编写测试的一种方式：</p>
+
+<pre>
+class IteratorTestCase extends UnitTestCase {
+  // ...
+
+  function TestMediaIteratorUsage() {
+    $this-&gt;assertIsA($it = $this-&gt;lib-&gt;getIterator('media'),
+                     'LibraryIterator');
+
+    $output = '';
+    <span class="docEmphStrong">while ($item = $it-&gt;next()) {</span>
+      $output .= $item-&gt;name;
+    }
+    $this-&gt;assertEqual('name1name2name3', $output);
+  }
+}
+</pre>
+
+<p class="docText">在上面的代码中，注意简化了的循环控制结构。<tt>next()</tt> 返回一个对象或 <tt>false</tt>，允许你在 <tt>while</tt> 循环条件中执行赋值操作。</p>
+
+<p class="docText">下几个例子研究使用小接口的 Iterator 模式的变种。简单起见，把 <tt>Library::getIterator()</tt> 方法修改为一个参数化 Factory，以便你可以从这个单一的方法得到四个方法的迭代器或两个方法(<tt>next()</tt> 和 <tt>reset()</tt>)的迭代器。</p>
+
+<pre>
+class Library {
+  // ...
+<span class="docEmphStrong">
+  function getIterator($type = false) {
+    switch (strtolower($type)) {
+      case 'media':
+        $iterator_class = 'LibraryIterator';
+        break;
+      default:
+        $iterator_class = 'LibraryGofIterator';
+    }
+
+    return new $iterator_class($this-&gt;collection);
+  }</span>
+}
+</pre>
+
+<p class="docText">这里，<tt>Library::getIterator()</tt> 现在接受一个参数以选择返回什么样的迭代器。默认返回的是 <tt>LibraryGofIterator</tt>(所以现有的测试仍然可以通过)。传递字符串 <tt>media</tt> 给方法，可以改为创建并返回 <tt>LibraryIterator</tt>。</p>
+
+<p class="docText">下面是实现 <tt>LibraryIterator</tt> 的一些代码：</p>
+
+<pre>
+class LibraryIterator {
+  protected $collection;
+
+  function __construct($collection) {
+    $this-&gt;collection = $collection;
+  }
+
+  function next() {
+    return next($this-&gt;collection);
+  }
+}
+</pre>
+
+<p class="docText">Oops! 可怕的红条！是什么导致了错误“<tt>Equal expectation fails at character 4 with name1name2name3 and name2name3</tt>”？不知何故，第一次迭代被跳过了 —— 这显然是一个 bug。为了更正这个错误，对于 <tt>next()</tt> 方法的第一次调用，返回 <tt>current()</tt>。</p>
+
+<pre>
+class LibraryIterator {
+  protected $collection;
+  <span class="docEmphStrong">protected $first = true;</span>
+
+  function __construct($collection) {
+    $this-&gt;collection = $collection;
+  }
+
+  function next() {
+    <span class="docEmphStrong">if ($this-&gt;first) {
+      $this-&gt;first = false;
+      return current($this-&gt;collection);
+    }</span>
+    return next($this-&gt;collection);
+  }
+}
+</pre>
+
+<p class="docText">Presto！绿条！这就是一个新型的 <tt>while</tt> 循环迭代器。</p>
+
+
+<h4 class="docSection2Title">Filtering Iterator(过滤迭代器)</h4>
+
+<p class="docText">利用 Iterators，不仅是显示集合的每个项目，你可以做更多的事情。你还可以选择显示哪些项目。我们修改 <tt>Library::getIterator()</tt>，以得到两个另外的迭代器类型。</p>
+
+<pre>
+class Library {
+  // ...
+
+  function getIterator($type = false) {
+    switch (strtolower($type)) {
+      case 'media':
+        $iterator_class = 'LibraryIterator';
+        break;
+      <span class="docEmphStrong">case 'available':
+        $iterator_class = 'LibraryAvailableIterator';
+        break;</span>
+      <span class="docEmphStrong">case 'released':
+        $iterator_class = 'LibraryReleasedIterator';
+        break;</span>
+      default:
+        $iterator_class = 'LibraryGofIterator';
+    }
+    return new $iterator_class($this-&gt;collection);
+  }
+}
+</pre>
+
+<p class="docText"><tt>LibraryAvailableIterator</tt> 类应该只遍历状态为“<tt>library</tt>”的项目(重新调用 <tt>checkOut()</tt> 方法，可以把状态改回“<tt>borrowed</tt>”)。</p>
+
+<pre>
+class IteratorTestCase extends UnitTestCase {
+  // ...
+
+  function TestAvailableIteratorUsage() {
+    <span class="docEmphStrong">$this-&gt;lib-&gt;add($dvd = new Media('test', 1999));</span>
+    $this-&gt;lib-&gt;add(new Media('name4', 1999));
+    $this-&gt;assertIsA($it = $this-&gt;lib-&gt;getIterator('available'),
+                     'LibraryAvailableIterator');
+
+    $output = '';
+    while ($item = $it-&gt;next()) {
+      $output .= $item-&gt;name;
+    }
+    <span class="docEmphStrong">$this-&gt;assertEqual('name1name2name3testname4', $output);</span>
+
+    <span class="docEmphStrong">$dvd-&gt;checkOut('Jason');</span>
+    $it = $this-&gt;lib-&gt;getIterator('available');
+
+    $output = '';
+    while ($item = $it-&gt;next()) {
+      $output .= $item-&gt;name;
+    }
+    <span class="docEmphStrong">$this-&gt;assertEqual('name1name2name3name4', $output);</span>
+  }
+}
+</pre>
+
+<p class="docText">这个测试创建了一个新的 <tt>Media</tt> 实例，并把它存储在变量 <tt>$dvd</tt> 中。第一个突出显示的 <tt>assertEqual()</tt> 断言验证当遍历 <tt>LibraryAvailableIterator</tt> 时可以提供一个新的项目。接下来，测试使用 <tt>checkOut()</tt> 方法，并验证新项目已经从显示中消失了。</p>
+
+<p class="docText">除了在返回项目之前执行过滤外，实现过滤的代码与 <tt>LibraryIterator::next()</tt> 非常相似。如果当前项目不满足过滤条件，代码就改为返回 <tt>$this-&gt;next()</tt>。</p>
+
+<pre>
+class LibraryAvailableIterator {
+  protected $collection = array();
+  protected $first = true;
+
+  function __construct($collection) {
+    $this-&gt;collection = $collection;
+  }
+
+  function next() {
+    if ($this-&gt;first) {
+      $this-&gt;first = false;
+      $ret = current($this-&gt;collection);
+    } else {
+      $ret = next($this-&gt;collection);
+    }
+
+    <span class="docEmphStrong">if ($ret &amp;&amp; 'library' != $ret-&gt;status) {
+      return $this-&gt;next();
+    }</span>
+    return $ret;
+  }
+}
+</pre>
+
+
+<h4 class="docSection2Title">Sorting Iterator(排序迭代器)</h4>
+
+<p class="docText">迭代器不仅可以显示全部或部分集合，它还可以做很多事情。迭代器还可以以一个特定的顺序显示集合。我们来创建一个迭代器，按发布时间对集合中的 <tt>Media</tt> 进行排序。</p>
+
+<p class="docText">为了进行测试，添加一些比在 <tt>setUp()</tt> 方法中添加的项目更早的 <tt>Media</tt> 实例。如果迭代器可以正常运行，这些更早的项目就应该排在迭代的最前面。</p>
+
+<pre>
+class IteratorTestCase extends UnitTestCase {
+  // ...
+
+  function TestReleasedIteratorUsage() {
+    $this-&gt;lib-&gt;add(new Media('second', 1999));
+    $this-&gt;lib-&gt;add(new Media('first', 1989));
+    $this-&gt;assertIsA($it = $this-&gt;lib-&gt;getIterator('released'),
+                    'LibraryReleasedIterator');
+
+    $output = array();
+    while ($item = $it-&gt;next()) {
+      $output[] = $item-&gt;name.'-'.$item-&gt;year;
+    }
+    $this-&gt;assertEqual('first-1989 second-1999 name1-2000 name3-2001 name2-2002',
+                        implode(' ', $output));
+  }
+}</pre>
+
+<p class="docText">这个测试中，每次迭代的项目的使用略有不同：并不仅仅在一个字符串后面附加 <tt>$name</tt> 值，而是由 <tt>$name</tt> 和 <tt>$year</tt> 属性组成一个字符串，然后附加到 $<tt>output</tt> 数组。</p>
+
+<p class="docText">除了在构造函数中另外增加了一行，<tt>LibraryReleasedIterator</tt> 的实现与 <tt>LibraryIterator</tt> 几乎相同。</p>
+
+<pre>
+class LibraryReleasedIterator extends LibraryIterator {
+  function __construct($collection) {
+    <span class="docEmphStrong">usort($collection, create_function('$a, $b', 'return ($a-&gt;year - $b-&gt;year);'));</span>
+    $this-&gt;collection = $collection;
+  }
+}
+</pre>
+
+<p class="docText">用粗体表示的一行在开始迭代前对 <tt>$collection</tt> 进行排序。你可以通过简单地继承 <tt>LibraryIterator</tt> 类，从而避免复制所有的其它代码。</p>
+
+<p class="docText">可以用一个外部迭代器来完成相同的排序迭代吗？是的，但你必须采用一些技巧。</p>
+
+<pre>
+class LibraryReleasedExternalIterator {
+  protected $collection;
+  protected $sorted_keys;
+  protected $key = -1;
+
+  function __construct($collection) {
+    $this-&gt;collection = $collection;
+    <span class="docEmphStrong">$sort_funct = create_function(
+      '$a, $b, $c = false',
+      'static $collection;
+      if ($c) {
+        $collection = $c;
+        return;
+      }
+      return ($collection-&gt;get($a)-&gt;year - $collection-&gt;get($b)-&gt;year);'
+    );</span>
+
+    $sort_funct(null, null, $this-&gt;collection);
+    $this-&gt;sorted_keys = $this-&gt;collection-&gt;keys();
+    usort($this-&gt;sorted_keys, $sort_funct);
+  }
+
+  function next() {
+    if (++$this-&gt;key &gt;= $this-&gt;collection-&gt;count()) {
+      return false;
+    } else {
+      <span class="docEmphStrong">return $this-&gt;collection-&gt;get($this-&gt;sorted_keys[$this-&gt;key]);</span>
+    }
+  }
+}
+</pre>
+
+<p class="docText">这里的关键是创建执行排序的工具函数。排序函数必须能够访问集合，以便可以取得比较成员。然而，因为生成的函数在 <tt>usort()</tt> 中使用，没有将集合作为一个可选参数传递的选项。相反，你可以使用上述代码块显示的技巧，在用 <tt>usort()</tt> 调用这个函数之前，在函数里面存储一个集合的引用。</p>
+
+<p class="docText">你排序的是集合的键列表。当 <tt>usort()</tt> 完成时，键将按照每个对象的 <tt>year</tt> 属性井然有序地存储在集合中。在 <tt>next()</tt> 方法中，可以通过 <tt>get()</tt> 方法访问集合中的对象，但是间接地通过 <tt>$sorted_keys</tt> 映射。如果你回想一下 GoF 风格迭代器的外部版本，不连续的数组或键中的字符串可能是有问题的。相同的技巧可用于一个简单的外部迭代器，以减少键顺序不连贯的问题。</p>
+
+
+<h4 class="docSection2Title">SPL Iterator(SPL 迭代器)</h4>
+
+<p class="docText">不讨论“标准 PHP 库”(Standard PHP Library，SPL) 迭代器，关于 Iterator 设计模式和 PHP 的章就不可能完成。</p>
+
+<p class="docText">迄今为止使用的 <tt>while</tt> 循环结构非常紧凑适用，但 PHP 程序员可能更喜欢用于数组迭代的 <tt>foreach</tt> 结构。直接在 <tt>foreach</tt> 循环中使用集合难道不好吗？其实，这正是 SPL 迭代器的目标。</p>
+
+<p class="docText">(尽管本章完全是为 PHP5 写的，下列 SPL 代码是唯一的只能在 PHP5 中运行的代码，并且只有当你已经用 SPL 激活编译 PHP5 后才可用。)Harry Fuecks 写过一篇不错的，介绍 SPL 和 SPL 迭代器的文章；见 <a class="docLink" target="_blank" href="http://www.sitepoint.com/article/php5-standard-library">http://www.sitepoint.com/article/php5-standard-library</a>。</p>
+
+<p class="docText">本质上，SPL 是一个完全不同的实现迭代的方法，因此，我们首先编写一个新的单元测试和一个新类，<tt>ForeachableLibrary</tt>。</p>
+
+<pre>
+class SplIteratorTestCase extends UnitTestCase {
+  protected $lib;
+
+  function setup() {
+    <span class="docEmphStrong">$this-&gt;lib = new ForeachableLibrary;</span>
+    $this-&gt;lib-&gt;add(new Media('name1', 2000));
+    $this-&gt;lib-&gt;add(new Media('name2', 2002));
+    $this-&gt;lib-&gt;add(new Media('name3', 2001));
+  }
+
+  function TestForeach() {
+    $output = '';
+    <span class="docEmphStrong">foreach ($this-&gt;lib as $item) {</span>
+      $output .= $item-&gt;name;
+    }
+    $this-&gt;assertEqual('name1name2name3', $output);
+  }
+}
+</pre>
+
+<p class="docText"><tt>ForeachableLibrary</tt> 是实现了 SPL Iterator 接口的集合。建立一个 SPL 迭代器，你必须实现五个方法：<tt>current()</tt>、<tt>next()</tt>、<tt>key()</tt>、<tt>valid()</tt> 和 <tt>rewind()</tt>。<tt>key()</tt> 返回集合的当前索引。<tt>rewind()</tt> 与 <tt>reset()</tt> 相似：从集合起始位置重新开始迭代。</p>
+
+<pre>
+class ForeachableLibrary extends Library implements Iterator {
+  protected $valid;
+
+  function current() {
+    return current($this-&gt;collection);
+  }
+
+  function next() {
+    $this-&gt;valid = (false !== next($this-&gt;collection));
+  }
+
+  function key() {
+    return key($this-&gt;collection);
+  }
+
+  function valid() {
+    return $this-&gt;valid;
+  }
+
+  function rewind() {
+    $this-&gt;valid = (false !== reset($this-&gt;collection));
+  }
+}
+</pre>
+
+<p class="docText">这里，我们仅实现了处理 <tt>$collection</tt> 属性所需的方法。(如果你没有实现所有的五个方法，而且把 <tt>implements Iterator</tt> 加入你的类定义，PHP 将会产生一个致命错误。)测试是“绿色的”，所以一切都还不错。</p>
+
+<p class="docText">只一个问题：实现受限于一种迭代类型 —— 排序和过滤都是不可能的。</p>
+
+<p class="docText">那么，可以采取什么措施来调整这种情况吗？是的！应用你从 Strategy 模式(见第 7 章)所学的，把 SPL 迭代器的五个方法委托给另一个对象。</p>
+
+<p class="docText">下面是 <tt>PolymorphicForeachableLibrary</tt> 的一个测试。</p>
+
+<pre>
+class PolySplIteratorTestCase extends UnitTestCase {
+  protected $lib;
+
+  function setup() {
+    <span class="docEmphStrong">$this-&gt;lib = new PolymorphicForeachableLibrary;</span>
+    $this-&gt;lib-&gt;add(new Media('name1', 2000));
+    $this-&gt;lib-&gt;add(new Media('name2', 2002));
+    $this-&gt;lib-&gt;add(new Media('name3', 2001));
+  }
+
+  function TestForeach() {
+    $output = '';
+    foreach ($this-&gt;lib as $item) {
+      $output .= $item-&gt;name;
+    }
+    $this-&gt;assertEqual('name1name2name3', $output);
+  }
+}
+</pre>
+
+<p class="docText">这种情况与 <tt>SplIteratorTestCase</tt> 测试的唯一差别在于 <tt>$this-&gt;lib</tt> 属性类是在 <tt>setUp()</tt> 方法中创建的 。这意味着：两个类的运行方式必须一致。</p>
+
+<p class="docText">下面就是 <tt>PolymorphicForeachableLibrary</tt>。</p>
+
+<pre>
+class PolymorphicForeachableLibrary extends Library implements Iterator {
+  protected $iterator;
+
+  function current() {
+    return $this-&gt;iterator-&gt;current();
+  }
+
+  function next() {
+    return $this-&gt;iterator-&gt;next();
+  }
+
+  function key() {
+    return $this-&gt;iterator-&gt;key();
+  }
+
+  function valid() {
+    return $this-&gt;iterator-&gt;valid();
+  }
+
+  function rewind() {
+    <span class="docEmphStrong">$this-&gt;iterator = new StandardLibraryIterator($this-&gt;collection);</span>
+    $this-&gt;iterator-&gt;rewind();
+  }
+}
+</pre>
+
+<p class="docText"><tt>Library</tt> 被扩展以得到集合操作方法。SPL 方法也被添加进来，而且所有操作都委托给在 <tt>rewind()</tt> 中创建的 <tt>$iterator</tt> 属性。下面是 <tt>StandardLibraryIterator</tt> 的代码。</p>
+
+<pre>
+class StandardLibraryIterator {
+  protected $valid;
+  protected $collection;
+
+  function __construct($collection) {
+    $this-&gt;collection = $collection;
+  }
+
+  function current() {
+    return current($this-&gt;collection);
+  }
+
+  function next() {
+    $this-&gt;valid = (false !== next($this-&gt;collection));
+  }
+
+  function key() {
+    return key($this-&gt;collection);
+  }
+
+  function valid() {
+    return $this-&gt;valid;
+  }
+
+  function rewind() {
+    $this-&gt;valid = (false !== reset($this-&gt;collection));
+  }
+}
+</pre>
+
+<p class="docText">这段代码应该看起来很熟悉。本质上，它只是 <tt>ForeachableLibrary</tt> 类的五个 SPL 函数的一个拷贝。测试通过。</p>
+
+<p class="docText">好，代码现在更加复杂了，但它是如何支持其它迭代器类型的呢？我们为一个“发行版”的迭代器添加一个测试，看看其它迭代器类型是如何在这个模式中工作的。</p>
+
+<pre>
+class PolySplIteratorTestCase extends UnitTestCase {
+  // ...
+
+  function TestReleasedForeach() {
+    $this-&gt;lib-&gt;add(new Media('second', 1999));
+    $this-&gt;lib-&gt;add(new Media('first', 1989));
+
+    $output = array();
+    $this-&gt;lib-&gt;iteratorType('Released');
+    foreach ($this-&gt;lib as $item) {
+      $output[] = $item-&gt;name .'-'. $item-&gt;year;
+    }
+    $this-&gt;assertEqual('first-1989 second-1999 name1-2000 name3-2001 name2-2002',
+                        implode(' ',$output));
+  }
+}
+</pre>
+
+<p class="docText">上面这个测试用例也应该看起来很熟悉，因为它与前面的“发行版”迭代器非常相似，不同的是使用 <tt>foreach</tt> 控制结构进行遍历。</p>
+
+<pre>
+class PolymorphicForeachableLibrary extends Library implements Iterator {
+  <span class="docEmphStrong">protected $iterator_type;</span>
+  protected $iterator;
+
+  function __construct() {
+    <span class="docEmphStrong">$this-&gt;iteratorType();</span>
+  }
+
+  <span class="docEmphStrong">function iteratorType($type = false) {
+    switch(strtolower($type)) {
+      case 'released':
+        $this-&gt;iterator_type = 'ReleasedLibraryIterator';
+        break;
+      default:
+        $this-&gt;iterator_type = 'StandardLibraryIterator';
+    }
+    $this-&gt;rewind();
+  }</span>
+
+  // ...
+
+  function rewind() {
+    <span class="docEmphStrong">$type = $this-&gt;iterator_type;</span>
+    <span class="docEmphStrong">$this-&gt;iterator = new $type($this-&gt;collection);</span>
+    $this-&gt;iterator-&gt;rewind();
+  }
+}
+</pre>
+
+<p class="docText">新的 <tt>iteratorType()</tt> 方法让你可以切换你想使用的迭代器类型。(因为迭代器的类型不在实例化期间选择，而且因为你可以通过再次调用 <tt>iteratorType()</tt> 方法选择不同的迭代器类型，所以代码实际上正在实现 State 模式，而非 Strategy 模式)</p>
+
+<pre>
+class ReleasedLibraryIterator extends StandardLibraryIterator {
+  function __construct($collection) {
+    <span class="docEmphStrong">usort($collection, create_function('$a, $b', 'return ($a-&gt;year - $b-&gt;year);'));</span>
+    $this-&gt;collection = $collection;
+  }
+}
+</pre>
+
+<p class="docText">你可以简单地通过扩展 <tt>StandardLibraryIterator</tt> 并覆盖构造函数来增加对引入的数组的排序，从而实现 <tt>ReleasedLibraryIterator</tt>。这样，你就有了一个可用的 <tt>PolymorphicForeachableLibrary</tt> 了。</p>
+
+
+<h3 class="docText">小结</h3>
+
+<p class="docText">Iterator 是标准化应用程序对象集合的一个好方法。这里的例子都以数组为基础，但对于具有相同接口的非数组集合，其能力更是强大。</p>
+
+<p class="docText">在 <tt>foreach</tt> 控制结构中使用集合确实很酷。SPL 实现中唯一遗憾的问题是与“<tt>Iterator</tt>”可能存在名字空间冲突。有多少 PHP4 时代的面向对象的代码，它们多少把 <tt>Iterator</tt> 类作为库迭代器的基类？在这些类中，又有多少定义了具有相同功能的五个必需的方法？或许实现 <tt>Foreachable</tt> 比较不会产生名字空间冲突。</p>
+
+<p class="docText">如果你选择使用 SPL，你应该研究一下其它被支持的迭代器，如 <tt>RecursiveArrayIterator</tt> 以及其他众多的迭代器。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

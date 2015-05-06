@@ -1,0 +1,660 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第五章 The Registry Pattern —— 注册模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第五章 The Registry Pattern —— 注册模式</h2>
+
+<p class="docText">避免使用全局变量通常被认为是一种“好形式”，因此，对象通常被当作参数从一个代码片断传递到另一个代码片段。但传递实例的问题就是，对象有时成了“过渡数据”，传递给一个函数只是为了再次传递给另一个真正需要这个对象的函数。</p>
+
+<p class="docText">为了使编写、阅读和修改代码更加简单，最好把不同对象的数量减到最少，并把如何得到无数的广泛使用的对象合并到一个单一的，众所周知的对象。</p>
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">如何通过一个单一的，众所周知的对象得到对象的引用？</p>
+
+
+<h3 class="docSection1Title">解决方案</h3>
+
+<p class="docText">Registry 设计模式就像一个“对象电话本”—— 一个目录 —— 用于存储和检索对象引用。(PHP 联合数组也起到了相似的“电话本”的作用，而且事实上，Registry 就是围绕 PHP 的强大的数组来实现的)。Registry 的特性经常封装在一个 Singleton(见第 4 章) 中，从而使 Registry 成为你的整个应用程序的确定的信息源。</p>
+
+<div class="docNote">
+
+<p class="docNoteText">关于  Registry 模式最主要的参考是《企业应用程序架构模式》(<span class="docEmphasis">Patterns of Enterprise Application Architecture</span>)，在这本书中，Martin Fowler 以 Java 为实现语言对这个模式进行了描述。Marcus Baker 也写了一篇详细介绍在 PHP 中使用 Registry 模式的文章，这篇文章可以在 <a class="docLink" target="_blank" href="phpPatterns.com">phpPatterns.com</a> 找到(<a class="docLink" target="_blank" href="http://www.phppatterns.com/index.php/article/articleview/75/1/1/">http://www.phppatterns.com/index.php/article/articleview/75/1/1/</a>)。另外，Baker 还集中考虑了测试，并更多地示范了测试驱动开发方法。</p>
+
+</div>
+
+<h3 class="docSection1Title">范例代码</h3>
+
+<p class="docText">正如 Martin Fowler 在关于 Registry 模式一章中提到的，可以用许多方法实现这个模式，并提供多种接口。我们来研究这个概念，并在 PHP4 中建立 Registry 模式的几种变种。</p>
+
+<p class="docText">我们从编写代码存储和取回对象实例，并提供对 Registry 的全局访问开始。一个实例变量保存了对象，而且 Registry 本身就是一个 Singleton。</p>
+
+<p class="docText">一如往常，测试决定需求。第一个测试就用来验证 Registry 是一个 Singleton。</p>
+
+<pre>
+// PHP4
+class RegistryPHP4TestCase extends UnitTestCase {
+  function testRegistryIsSingleton() {
+    $this-&gt;assertIsA($reg =&amp; Registry::getInstance(), 'Registry');
+    $this-&gt;assertReference($reg, Registry::getInstance());
+  }
+}
+</pre>
+
+<p class="docText">有了前面 Singleton 模式一章学习的知识，你应该可以快速编写一个能够通过这个测试的 Registry 类。下面就是一个满足了这个测试的 Registry 类(忽略了与执行对象创建无关的代码)：</p>
+
+<pre>
+class Registry {
+  function &amp;getInstance() {
+    static $instance = array();
+
+    if (!$instance) $instance[0] =&amp; new Registry;
+
+    return $instance[0];
+  }
+}
+</pre>
+
+<p class="docText">一个简单的静态数组就足够用来记录 Singleton 实例了。</p>
+
+<p class="docText">接下来，我们转向 Registry 的特定特性上来。Registry 应该提供 <tt>get()</tt> 和 <tt>set()</tt> 方法，用某个键来存储和取回对象，它还应该提供一个 <tt>isValid()</tt> 方法来决定一个特定的键是否已经被设置了。</p>
+
+<p class="docText">这三个方法中最简单的是最后面一个。下面就是 <tt>isValid()</tt> 的两个测试用例：</p>
+
+<pre>
+class RegistryPHP4TestCase extends UnitTestCase {
+  function testRegistryIsSingleton() { /*...*/ }
+
+  <span class="docEmphStrong">function testEmptyRegistryKeyIsInvalid() {
+    $reg =&amp; Registry::getInstance();
+    $this-&gt;assertFalse($reg-&gt;isValid('key'));
+  }</span>
+
+  <span class="docEmphStrong">function testEmptyRegistryKeyReturnsNull() {
+    $reg =&amp; Registry::getInstance();
+    $this-&gt;assertNull($reg-&gt;get('key'));
+  }</span>
+}
+</pre>
+
+<div class="docNote">
+
+<p class="docNoteTitle">assertFalse()</p>
+
+<p class="docNoteText"><tt>assertFalse()</tt> 与 <tt>assertTrue()</tt> 完全相反：如果第一个参数等价于 PHP 布尔值 <tt>false</tt>，测试通过。</p>
+
+</div>
+
+<p class="docText">按照测试驱动开发，编写尽可能少的代码来满足你现有的测试，然后，如果还没有满足类的所有需求，就增加更多的测试。下面就是满足前面测试的最简单的代码：</p>
+
+<pre>
+class Registry {
+  <span class="docEmphStrong">function isValid() {
+    return false;
+  }</span>
+
+  <span class="docEmphStrong">function get() {}</span>
+
+  function &amp;getInstance() {
+    static $instance = array();
+
+    if (!$instance) $instance[0] =&amp; new Registry;
+
+    return $instance[0];
+  }
+}
+</pre>
+
+<p class="docText">诚然，<tt>isValid()</tt> 和 <tt>get()</tt> 的代码片断并没有什么灵感，但是所有测试确实通过了。是时候添加一些更有内涵的测试了。</p>
+
+<pre>
+class RegistryPHP4TestCase extends UnitTestCase {
+  function testRegistryIsSingleton() { /*...*/ }
+  function testEmptyRegistryKeyIsInvalid() { /*...*/ }
+  function testEmptyRegistryKeyReturnsNull() { /*...*/ }
+
+
+  <span class="docEmphStrong">function testSetRegistryKeyBecomesValid() {
+    $reg =&amp; Registry::getInstance();
+
+    $test_value = 'something';
+    $reg-&gt;set('key', $test_value);
+
+    $this-&gt;assertTrue($reg-&gt;isValid('key'));
+  }</span>
+}
+</pre>
+
+<p class="docText">为了满足 <tt>testSetRegistryKeyBecomesValid()</tt>，Registry 类必须包含一些方法，用于跟踪一个特定的键是否已经用 <tt>set()</tt> 设置了。明显的实现方式是利用一个 PHP 联合数组作实例变量，并利用 PHP 的 <tt>array_key_exists()</tt> 函数来决定关心的索引是否已经创建。下面就是 Registry 的可能的下一步实现：</p>
+
+<pre>
+class Registry {
+  <span class="docEmphStrong">var $_store = array();</span>
+
+  <span class="docEmphStrong">function isValid($key) {
+    return array_key_exists($key, $this-&gt;_store);
+  }</span>
+
+  <span class="docEmphStrong">function set($key, $obj) {
+    $this-&gt;_store[$key] = $obj;
+  }</span>
+
+  function get() {}
+
+  function &amp;getInstance() {
+    static $instance = array();
+
+    if (!$instance) $instance[0] =&amp; new Registry;
+
+    return $instance[0];
+  }
+}
+</pre>
+
+<p class="docText">通过在声明的时候初始化 <tt>$_store</tt> 变量，就不再需要一个构造函数了。</p>
+
+<p class="docText">(因为在 PHP4 中没有严格意义上的可见性，代码遵循为 <tt>private</tt> 变量添加下划线前缀的约定。)</p>
+
+<p class="docText">测试再次通过了；继续最后一个功能：给定一个键，<tt>Registry::get()</tt> 需要返回指定对象的一个引用。下面就是获取这个意图的测试：</p>
+
+<pre>
+class RegistryPHP4TestCase extends UnitTestCase {
+  function testRegistryIsSingleton() { /*...*/ }
+  function testEmptyRegistryKeyIsInvalid() { /*...*/ }
+  function testEmptyRegistryKeyReturnsNull() { /*...*/ }
+  function testSetRegistryKeyBecomesValid() { /*...*/ }
+
+  <span class="docEmphStrong">function testSetRegistryValueIsReference() {
+    $reg =&amp; Registry::getInstance();
+
+    $test_value = 'something';
+    $reg-&gt;set('key', $test_value);
+
+    $this-&gt;assertReference($test_value, $reg-&gt;get('key'));
+
+    //another way to test the reference
+    $test_value .= ' else';
+    $this-&gt;assertEqual('something else', $reg-&gt;get('key'));
+  }</span>
+}
+</pre>
+
+<p class="docText">下面是 Registry 类的完整实现：</p>
+
+<pre>
+class Registry {
+  var $_store = array();
+
+  function isValid($key) {
+    return array_key_exists($key, $this-&gt;_store);
+  }
+
+  <span class="docEmphStrong">function &amp;get($key) {
+    if (array_key_exists($key, $this-&gt;_store)) {
+      return $this-&gt;_store[$key];
+    }
+  }</span>
+
+  <span class="docEmphStrong">function set($key, &amp;$obj) {
+    $this-&gt;_store[$key] =&amp; $obj;
+  }</span>
+
+  function &amp;getInstance() {
+    static $instance = array();
+
+    if (!$instance) $instance[0] =&amp; new Registry;
+
+    return $instance[0];
+  }
+}
+</pre>
+
+<p class="docText"><tt>Registry::get()</tt> 方法返回一个对象引用。同样地，<tt>Registry::set()</tt> 方法的 <tt>$obj</tt> 参数定义为按引用传递，而且引用被分配给 <tt>$this-&gt;_store[$key]</tt>。<tt>get()</tt> 和 <tt>set()</tt> 方法的联合，以及恰当地使用引用，允许 <tt>testRegistry()</tt> 测试中的 <tt>assertReference()</tt> 断言通过。</p>
+
+<div class="docNote">
+
+<p class="docNoteText"><tt>Registry::get()</tt> 也可以写成 <tt>return @$this-&gt;_store[$key;]</tt>，不过，最好还是避免使用错误抑制符。此外，使用错误抑制符的代码还会变得更加模糊，如果你以后不得不再次查看这些代码，你将需要花费更多的时间来理解它们。相反，<tt>array_key_exists()</tt> 函数使需要避免的错误变得更加明确。</p>
+
+</div>
+
+<p class="docText">在 PHP5 中，对象句柄再一次成了救星，为你免除了对象引用传递的麻烦。实际上，Registry 的实现已经变得微不足道了，因为你可以访问联合数组，再也不用担心因为没有通过引用传递对象会带来致命错误的可能性。使用 PHP5，还可以在 Registry 中混合使用对象和字面值。</p>
+
+
+<h4 class="docSection2Title">一个例子</h4>
+
+<p class="docText">那么，实际中的 Registry 会是什么样子的呢？在 web 应用程序的开发中，包含一个单一数据库连接(因此广泛使用 Singleton 来管理连接)是非常典型的。但是，比如说，由于遗留问题，你的应用程序的客户数据库与你的在线订单数据库是独立的，然后你的数据库分析员(DBA)又把旧的订单转移到了一个存档数据库，再一次，完全独立于你的客户数据库和(当前的)订单数据库。那么，你如何才能方便地管理这三个数据库连接，而不需要编写三个不同的 Singleton 呢？答案就是使用 Registry。</p>
+
+<pre>
+class DbConnections extends Registry {}
+</pre>
+
+<div class="docNote">
+
+<p class="docNoteTitle">提示</p>
+
+<p class="docNoteText">当你在你的代码中使用一个设计模式的时候，你的类名还应该要反映它在你程序中所扮演的角色和功能，而没必要反映模式名。用模式名来代表代码对于与项目之外的程序员交流设计是非常有帮助的。不过，你的类名无论如何应该合乎你程序所在的领域，而且能够为项目成员很好地理解。续 ...</p>
+
+</div>
+
+<div class="docNote">
+
+<p class="docNoteTitle">提示: 续 ...</p>
+
+<p class="docNoteText">本章剩余部分例子的类名都反映的是模式名以及它们的特定的实现方式，而不是在程序中的角色。之所以这样做是为了保持例子更加明确，不要把它们当作一个好的命名规范。</p>
+
+</div>
+
+<p class="docText"><tt>DbConnections</tt> 是一个 Singleton，而且因为它继承自 Registry 类，所以它综合了两种模式的所有好处。</p>
+
+<p class="docText">以下代码片段在 Registry 中创建并存储了每个数据库的一个连接。</p>
+
+<pre>
+// initial setup, somewhere near the start of your script
+$dbc =&amp; DbConnections::getInstance();
+$dbc-&gt;set('contacts',
+           new MysqlConnection('user1', 'pass1', 'db1', 'host1'));
+$dbc-&gt;set('orders',
+           new MysqlConnection('user2', 'pass2', 'db2', 'host2'));
+$dbc-&gt;set('archives',
+           new MysqlConnection('user3', 'pass3', 'db3', 'host3'));
+</pre>
+
+<p class="docText">Registry 加载了数据，该准备使用了。</p>
+
+<pre>
+// domain model classes
+class Customer {
+  var $db;
+
+  function Customer() {
+    $dbc =&amp; DbConnections::getInstance();
+    $this-&gt;db =&amp; $dbc-&gt;get('contacts');
+  }
+
+  //...
+}
+
+class Orders {
+  var $db_cur;
+  var $db_hist;
+
+  function Contact() {
+    $dbc =&amp; DbConnections::getInstance();
+    $this-&gt;db_cur =&amp; $dbc-&gt;get('orders');
+    $this-&gt;db_hist =&amp; $dbc-&gt;get('archive');
+  }
+
+  //...
+}
+</pre>
+
+<p class="docText">一个类根据客户数据库建模，另一个类根据历史的和当前的订单数据库建模。得到正确的连接分为两次查找：一次查找 Registry，另一次查找与键关联的对象。</p>
+
+
+<h4 class="docSection2Title">把 Registry 实现为 MonoState 对象</h4>
+
+<p class="docText">如前所述，Registry 模式有许多可能的实现方式。</p>
+
+<p class="docText">第一种是把 Registry 实现为一个 MonoState 对象(MonoState 模式在第 4 章 —— 单态模式结尾有简单介绍)。按照这种设计，任何 Registry 实例都需要访问相同的数组。我们称新类为 <tt>RegistryGlobal</tt>，以区别于仅被开发来表现实现的本质的 Registry 类。以下是展示这个想法的测试(它应该看起来非常熟悉)：</p>
+
+<pre>
+class RegistryGlobalPHP4TestCase extends UnitTestCase {
+  function testRegistryGlobal() {
+    $reg =&amp; new RegistryGlobal;
+
+    $this-&gt;assertFalse($reg-&gt;isValid('key'));
+    $this-&gt;assertNull($reg-&gt;get('key'));
+
+    $test_value = 'something';
+    $reg-&gt;set('key', $test_value);
+
+    $this-&gt;assertReference($test_value, $reg-&gt;get('key'));
+  }
+}
+</pre>
+
+<p class="docText">实现看起来应该也很熟悉：</p>
+
+<pre>
+class RegistryGlobal {
+  var $_store = array();
+
+  function isValid($key) {
+    return array_key_exists($key, $this-&gt;_store);
+  }
+
+  function &amp;get($key) {
+    if (array_key_exists($key, $this-&gt;_store)) {
+      return $this-&gt;_store[$key];
+    }
+  }
+
+  function set($key, &amp;$obj) {
+    $this-&gt;_store[$key] =&amp; $obj;
+  }
+}
+</pre>
+
+<p class="docText"><tt>isValid()</tt>、<tt>get()</tt> 和 <tt>set()</tt> 方法与前面开发的 <tt>Registry</tt> 类的方法是完全相同的。</p>
+
+<p class="docText">接下来，我们编写一个测试来验证 <tt>RegistryGlobal</tt> 类行使一个 MonoState 的职责：</p>
+
+<pre>
+class RegistryGlobalPHP4TestCase extends UnitTestCase {
+  function testRegistryGlobal() { /*...*/ }
+
+  function testRegistryGlobalIsMonoState() {
+    $reg =&amp; new RegistryGlobal;
+    $reg2 =&amp; new RegistryGlobal;
+
+    $this-&gt;assertCopy($reg, $reg2);
+
+    $test_value = 'something';
+    $reg-&gt;set('test', $test_value);
+
+    $this-&gt;assertReference($reg-&gt;get('test'), $reg2-&gt;get('test'));
+  }
+}
+</pre>
+
+<div class="docNote">
+
+<p class="docNoteTitle">assertCopy</p>
+
+<p class="docNoteText"><tt>assertCopy()</tt> 断言与 <tt>assertReference()</tt> 正好相反，所以如果传递的两个变量不是引用，它就能通过。</p>
+
+</div>
+
+<p class="docText">这里，测试代码创建了两个 <tt>RegistryGlobal</tt> 类的实例，并验证它们并非同一个对象的引用。设置一个 Registry 中的一个值，最后验证两个实例返回相同的对象。如果测试通过，<tt>RegistryGlobal</tt> 类就拥有了 MonoState 的行为。</p>
+
+<pre>
+<span class="docEmphStrong">define('REGISTRY_GLOBAL_STORE', '__registry_global_store_key__');</span>
+
+class RegistryGlobal {
+  <span class="docEmphStrong">var $_store;</span>
+
+  <span class="docEmphStrong">function RegistryGlobal() {
+    if (!array_key_exists(REGISTRY_GLOBAL_STORE, $GLOBALS)
+        || !is_array($GLOBALS[REGISTRY_GLOBAL_STORE])) {
+      $GLOBALS[REGISTRY_GLOBAL_STORE] = array();
+    }
+
+    $this-&gt;_store =&amp; $GLOBALS[REGISTRY_GLOBAL_STORE];
+  }</span>
+
+  function isValid($key) {
+    return array_key_exists($key, $this-&gt;_store);
+  }
+
+  function &amp;get($key) {
+    if (array_key_exists($key, $this-&gt;_store)) {
+      return $this-&gt;_store[$key];
+    }
+  }
+
+  function set($key, &amp;$obj) {
+    $this-&gt;_store[$key] =&amp; $obj;
+  }
+}
+</pre>
+
+<p class="docText">这种可选方法的神奇之处在于 <tt>$this-&gt;_store =&amp; $GLOBALS[REGISTRY_GLOBAL_STORE];</tt> 这一行，引用操作符把全局数组绑定到实例变量 <tt>$_store</tt>。这是 MonoState 实现的关键所在：每次在对象中使用 <tt>$this-&gt;_store</tt>，真实的效果都会被反射到全局变量。</p>
+
+<p class="docText">但我几乎不推荐基于全局变量的解决方法。如果 PHP4 支持的话，静态类变量会是一个更好的解决方法。然而，有办法在自己的代码中通过引用实现静态类变量吗？</p>
+
+<p class="docText">测试与 <tt>RegistryGlobal</tt> 的测试相似：</p>
+
+<pre>
+class RegistryMonoStatePHP4TestCase extends UnitTestCase {
+  function testRegistryMonoState() {
+    $this-&gt;assertCopy($reg =&amp; new RegistryMonoState,
+
+    $reg2 =&amp; new RegistryMonoState);
+
+    $this-&gt;assertFalse($reg-&gt;isValid('key'));
+    $this-&gt;assertNull($reg-&gt;get('key'));
+
+    $test_value = 'something';
+    $reg-&gt;set('key', $test_value);
+
+    $this-&gt;assertReference($reg-&gt;get('key'), $reg2-&gt;get('key'));
+  }
+}
+</pre>
+
+<p class="docText">为了创建你自己的类静态变量，可以把一个函数静态变量(function static variable)的引用绑定到一个类实例变量。</p>
+
+<pre>
+class RegistryMonoState {
+  var $_store;
+
+  <span class="docEmphStrong">function &amp;_initRegistry() {
+    static $store = array();
+    return $store;
+  }</span>
+
+  <span class="docEmphStrong">function RegistryMonoState() {
+    $this-&gt;_store =&amp; $this-&gt;_initRegistry();
+  }</span>
+
+  function isValid($key) {
+    return array_key_exists($key, $this-&gt;_store);
+  }
+
+  function &amp;get($key) {
+    if (array_key_exists($key, $this-&gt;_store)) {
+      return $this-&gt;_store[$key];
+    }
+  }
+
+  function set($key, &amp;$obj) {
+    $this-&gt;_store[$key] =&amp; $obj;
+  }
+}
+</pre>
+
+<p class="docText"><tt>_initRegistry()</tt> 方法包含一个静态变量，<tt>$store</tt>，初始化为一个数组。这个静态变量通过引用返回。在构造函数中，<tt>$_store</tt> 实例变量设置为从 <tt>_initRegistry()</tt> 方法返回的引用，即静态数组。瞧瞧！一个 PHP4 类静态变量就这样实现了。</p>
+
+
+<h4 class="docSection2Title">用类静态变量实现</h4>
+
+<p class="docText">在 PHP5 中，没必要自己实现类静态变量，因为语言本身直接支持静态类变量的概念。因此，PHP5 一定程度上简化了实现。而且，引用和对象不再有在 PHP4 中的含义，但 <tt>assertReference()</tt> 能处理这之间的差异，如果两个变量指向同一个对象句柄，则通过测试。</p>
+
+<p class="docText">下面就是用于 PHP5 的，从熟悉的 Registry 测试用例修改而来的测试用例：</p>
+
+<pre>
+// PHP5
+class RegistryMonoStatePHP5TestCase extends UnitTestCase {
+  function testRegistryMonoState() {
+    $this-&gt;assertCopy($reg = new RegistryMonoState,
+
+    $reg2 = new RegistryMonoState);
+
+    $this-&gt;assertFalse($reg-&gt;isValid('key'));
+    $this-&gt;assertNull($reg-&gt;get('key'));
+
+    $test_value = new TestObj;
+    $reg-&gt;set('key', $test_value);
+
+    $this-&gt;assertReference($test_value, $reg2-&gt;get('key'));
+  }
+}
+</pre>
+
+<p class="docText">以下是 PHP5 版本的使用静态类变量的 Registry：</p>
+
+<pre>
+class RegistryMonoState {
+  protected static $store = array();
+
+  function isValid($key) {
+    return array_key_exists($key, RegistryMonoState::$store);
+  }
+
+  function get($key) {
+    if (array_key_exists($key, RegistryMonoState::$store)) {
+      return RegistryMonoState::$store[$key];
+    }
+  }
+
+  function set($key, $obj) {
+    RegistryMonoState::$store[$key] = $obj;
+  }
+}
+</pre>
+
+<p class="docText">在 PHP5 中按这种方式编写 Registry 的一个有趣的效果是，你实际上可以用相同的一组代码同时使用实例和静态方法来调用。下面就是一个用来说明这点的测试用例 —— 它只使用静态方法调用。</p>
+
+<pre>
+class RegistryMonoStatePHP5TestCase extends UnitTestCase {
+  function testRegistryMonoState() { /*...*/ }
+
+  function testRegistryMonoStateStaticCalls() {
+    $this-&gt;assertFalse(RegistryMonoState::isValid('key'));
+    $this-&gt;assertNull(RegistryMonoState::get('key'));
+
+    $test_value = new TestObj;
+    RegistryMonoState::set('key', $test_value);
+
+    $this-&gt;assertIdentical($test_value, RegistryMonoState::get('key'));
+  }
+}
+</pre>
+
+<p class="docText">现在，你已经看到了 PHP5 中的静态调用接口，下面我们在 PHP4 中编写相同的接口。如之前的 PHP4“静态类变量”那样，这个实现需要使用“返回函数静态变量引用”的技巧。</p>
+
+<p class="docText">PHP4 静态调用接口的测试看起来与 PHP5 版本的测试相似。</p>
+
+<pre>
+// PHP4
+class RegistryStaticPHP4TestCase extends UnitTestCase {<p></p>
+  function testRegistryStatic() {
+    $this-&gt;assertFalse(RegistryStatic::isValid('key'));
+    $this-&gt;assertNull(RegistryStatic::get('key'));
+
+    $test_value = 'something';
+    RegistryStatic::set('key', $test_value);
+
+    $this-&gt;assertReference($test_value, RegistryStatic::get('key'));
+  }
+}
+</pre>
+
+<p class="docText">下面是满足测试的一个实现：</p>
+
+<pre>
+class RegistryStatic {
+  <span class="docEmphStrong">function &amp;_getRegistry() {
+    static $store = array();
+    return $store;
+  }</span>
+
+  function isValid($key) {
+    <span class="docEmphStrong">$store =&amp; RegistryStatic::_getRegistry();</span>
+    return array_key_exists($key, $store);
+  }
+
+  function &amp;get($key) {
+    $store =&amp; RegistryStatic::_getRegistry();
+
+    if (array_key_exists($key, $store)) {
+      return $store[$key];
+    }
+  }
+
+  function set($key, &amp;$obj) {
+    $store =&amp; RegistryStatic::_getRegistry();
+    $store[$key] =&amp; $obj;
+  }
+}
+</pre>
+
+<p class="docText">这个实现的关键是让 <tt>_getRegistry()</tt> 方法返回静态数组的引用。<tt>$store =&amp; RegistryStatic::_getRegistry();</tt> 这一行，在随后的函数中设置本地变量 <tt>$store</tt> 为静态数组的引用。允许所有函数静态访问数组，并允许所有方法被静态调用。</p>
+
+<p class="docText">也可以不使用 PHP4 静态类变量技巧却能够达到相同效果：把最初的基于 Singleton 的 Registry 类与一个包装类结合起来，从而允许静态方法调用。这个类的测试与 <tt>testRegistryStatic()</tt> 相同，但实现如下所示：</p>
+
+<pre>
+class RegistryStatic {
+  function isValid($key) {
+    $reg =&amp; Registry::getInstance();
+    return $reg-&gt;isValid($key);
+  }
+
+  function &amp;get($key) {
+    $reg =&amp; Registry::getInstance();
+    return $reg-&gt;get($key);
+  }
+
+  function set($key, &amp;$obj) {
+    $reg =&amp; Registry::getInstance();
+    $reg-&gt;set($key, $obj);
+  }
+}
+</pre>
+
+
+<h3 class="docSection1Title">小结</h3>
+
+<p class="docText">尽管 Registry 简化了对大量对象的访问，但仍然有很多与全局变量关联的问题。你必须确保请求的键在访问之前就已经初始化了，而且因为可以全局访问 setter 方法，对象仍然可能在其它地方不经意的被替换。很明显，全局数据有它的好处和理由，但你应该记住任何全局变量总是不可信的。</p>
+
+
+<h4 class="docSection12Title">嵌入式 Registry</h4>
+
+<p class="docText">除了单独使用 Registry 模式，如本章所示，Registry 与其它对象结合时也是非常强大的。考虑对象的创建有些昂贵的情况(可能是由于需要大量数据库调用来初始化对象)，以及对象可能在程序中多次使用的情况，如果是这样，你想创建一个组合了 Factory(见第3章) 和 Registry 模式的功能的“Finder”类来维护已经创建的对象的缓存，而不用再次创建它们吗？</p>
+
+<p class="docText">下面是一个 <tt>Contact</tt> 类，其中，<tt>AddressBook</tt> 是 Factory。</p>
+
+<pre>
+class AddressBook {
+  function &amp;findById($id) {
+    return new Contact($id);
+  }
+}
+
+class Contact {
+  function Contact($id) {
+    // expensive queries to create object using $id
+  }
+
+  // ... other methods
+}
+</pre>
+
+<p class="docText">你可以在 <tt>AddressBook</tt> 类中嵌入 Registry 来提供缓存功能。如下所示：</p>
+
+<pre>
+class AddressBook {
+  <span class="docEmphStrong">var $registry;</span>
+
+  <span class="docEmphStrong">function AddressBook() {
+    $this-&gt;registry =&amp; Registry::getInstance();
+  }</span>
+
+  <span class="docEmphStrong">function &amp;findById($id) {
+    if (!$this-&gt;registry-&gt;isValid($id)) {
+      $this-&gt;registry-&gt;set($id, new Contact($id));
+    }
+
+    return $this-&gt;registry-&gt;get($id);
+  }</span>
+}
+</pre>
+
+<p class="docText"><tt>AddressBook</tt> 的构造函数把 Registry 绑定到一个实例变量。当一个特殊的 <tt>ID</tt> 被创建并在 <tt>findById()</tt> 方法中被请求时，Registry 被检测，以确定对象是否已经被缓存了。如果没有，就会创建一个新的对象并存储在 Registry 中。请求的对象将通过函数从 Registry 取出，然后返回。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

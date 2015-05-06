@@ -1,0 +1,560 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第二章 The Value Object Pattern —— 值对象模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+<h1 class="docChapterTitle">第二章 The Value Object Pattern —— 值对象模式</h1>
+
+<p class="docText">几乎在最简单的应用程序中，大多数对象都有一个“身份”。重要的业务对象，比如 Customer 或 SKU，都会有一两个属性 —— 比如说，ID、name、email 地址等 — 用于区别同一个类的不同实例。此外，一个具有“持续”身份的对象：是一个贯穿整个程序存在的单一对象。对你，程序设计者而言，“Customer A”在哪儿都是“Customer A”，而且，只要程序还在运行，对“Customer A”的改变就仍然有效。</p>
+
+<p class="docText">但是，对象本身并不需要有一个身份。有些对象纯粹是用来描述其它对象的特征的。</p>
+
+<p class="docText">举例来说，通常，我们用一个对象来代表日期，数字，或货币。<tt>Date</tt>、<tt>Integer</tt> 或 <tt>Dollar</tt> 类是唾手可得的高效封装器，当需要的时候，很容易复制，比较，或创建。</p>
+
+<p class="docText">咋一看，简单的描述性对象似乎很容易实现：它们仅仅是一些(简单的)类，与 Customer 或 SKU 在结构上没什么不同。这种看法几乎正确，但“几乎正确”往往就会导致 bugs。</p>
+
+<p class="docText">观察下面这个几乎正确的 <tt>Dollar</tt> 的实现(这个类之所以被命名为 <tt>BadDollar</tt>，是因为它不是一个理想的实现)，看看你是否能够找出臭虫。</p>
+
+<pre>
+// PHP5
+class BadDollar {
+  protected $amount;
+
+  public function __construct($amount = 0) {
+    $this->amount = (float)$amount;
+  }
+
+  public function getAmount() {
+    return $this->amount;
+  }
+
+  public function add($dollar) {
+    $this->amount += $dollar->getAmount();
+  }
+}
+
+class Work {
+  protected $salary;
+
+  public function __construct() {
+    $this->salary = new BadDollar(200);
+  }
+
+  public function payDay() {
+    return $this->salary;
+  }
+}
+
+class Person {
+  public $wallet;
+}
+
+function testBadDollarWorking() {
+  $job = new Work;
+  $p1 = new Person;
+  $p2 = new Person;
+
+  $p1->wallet = $job->payDay();
+  $this->assertEqual(200, $p1->wallet->getAmount());
+  $p2->wallet = $job->payDay();
+  $this->assertEqual(200, $p2->wallet->getAmount());
+
+  $p1->wallet->add($job->payDay());
+  $this->assertEqual(400, $p1->wallet->getAmount());
+
+  // this is bad — actually 400
+  $this->assertEqual(200, $p2->wallet->getAmount());
+
+  // this is really bad — actually 400
+  $this->assertEqual(200, $job->payDay()->getAmount());
+}
+</pre>
+
+<p class="docText">那么，错误究竟出在哪儿呢？如果你不能明确地看出这个例子的问题所在，给你一个提示：雇员 <tt>$p1</tt> 和 <tt>$p2</tt> 共享了同一个 <tt>BadDollar</tt>。</p>
+
+<p class="docText">首先，<tt>Work</tt> 和 <tt>Person</tt> 的实例被创建出来。然后，假设每个人最初都有一个空钱包，并把 <tt>Person::wallet</tt> 设置为由 W<tt>ork::payDay()</tt> 返回的 <tt>BadDoller</tt> 对象。</p>
+
+<p class="docText">还记得 PHP5 对象句柄吗？它就是罪魁祸首。因为它，<tt>$job::salary</tt>、<tt>$p1::wallet</tt> 和 <tt>$p2::wallet</tt>，三个具有不同“身份”而且概念不同的对象实际上都指向同一个对象。</p>
+
+<p class="docText">这样，第二个支付日，<tt>$job->padDay()</tt>，本来只想给 <tt>$p1</tt> 发工资，却出乎意料地也给 <tt>$p2</tt> 发了，并且还改变了 <tt>$job</tt> 的基本 <tt>$salary</tt>。因此，最后两次断言失败：</p>
+
+<pre>
+Value Object PHP5 Unit Test
+1) Equal expectation fails because [Integer: 200] differs from [Float: 400] by 200
+   in testBadDollarWorking
+   in ValueObjTestCase
+2) Equal expectation fails because [Integer: 200] differs from [Float: 400] by 200
+   in testBadDollarWorking
+   in ValueObjTestCase
+FAILURES!!!
+</pre>
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">那么，如何实现一个轻量的，或者说，易于构造的，像 <tt>Date</tt> 或 <tt>Dollar</tt> 那样的描述性对象呢？</p>
+
+
+<h3 class="docSection1Title">解决方法</h3>
+
+<p class="docText">轻量对象应该就像 PHP 整数那样：如果把同一个对象赋值给两个不同的变量，然后改变其中之一，另一个应该保持不变。事实上，这正是 Value Object 模式的目标所在。</p>
+
+<p class="docText">Value Object 在 PHP4 和 PHP5 中的实现是不同的。</p>
+
+<p class="docText">正如你在上面所看到的，PHP5 基于句柄的对象访问方式(这是 PHP5 新引入的一种对象访问方式) —— 一个典型的在 PHP4 中试图通过引用模仿的例子 —— 正是问题所在。为了解决这个问题，实现一个正确的 <tt>Dollar</tt> Value Object，使 <tt>$amount</tt> 属性 —— 通常情况下，Value Object 的所有属性 —— 不可改变。尽管 PHP 并没有提供不变性特性，但你可以结合属性可见性以及 getter 和 setter 方法来进行完整的模拟。</p>
+
+<p class="docText">相反，PHP4 (几乎)把所有对象都当作 Value Object，因为如果省略引用操作符 <tt>&</tt>， PHP4 赋值操作符 <tt>=</tt> 就会创建对象的一个拷贝。 在 PHP4 中实现 Value Object，你只需要抛弃细心培养起来的，总是通过引用创建、传递和取得对象的习惯就可以了。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">术语 —— Immutable </p>
+
+<p class="docNoteText">字典中对 immutable 的解释是“不能或不容易改变”。在编程领域，这个术语指的是一个一旦设置了就不再改变的值。</p>
+
+</div>
+
+<h4 class="docSection1Title">PHP5 范例代码</h4>
+
+<p class="docText">既然从 PHP5 代码开始，我们就来完成一个 PHP5 Value Object 实现，建立一个更好的 <tt>Dollar</tt> 类。在进行 OOP 编程时，命名是非常重要的：选择一个单一的货币类型作为这个类的名字，可以明确地表明它不处理多种货币类型。</p>
+
+<pre>
+class Dollar {
+  protected $amount;
+
+  public function __construct($amount = 0) {
+    $this->amount = (float)$amount;
+  }
+
+  public function getAmount() {
+    return $this->amount;
+  }
+
+  public function add($dollar) {
+    return new Dollar($this->amount + $dollar->getAmount());
+  }
+}
+</pre>
+
+<p class="docText">把 <tt>$amount</tt> 定义成 <tt>protected</tt>，以阻止从类本身之外访问 <tt>Dollar::amount</tt> 属性，是使 <tt>Dollar::amount</tt> 不可改变的第一步。<tt>protected</tt>(<tt>private</tt>) 用于拒绝对属性进行直接访问。</p>
+
+<p class="docText">通常，在使用这种 OOP 习惯的时候，都会创建一个像 <tt>public setAmount($amount) { $this->amount = $amount; }</tt> 这样的“setter”方法。 在这个例子中，没有定义 setter 方法，因为 <tt>Dollar::amount</tt> 在对象初始化时就被设置好了。<tt>Dollar::getAmount()</tt> 是一个 accessor 方法，以 <tt>float</tt> 值的形式为 <tt>Dollar</tt> 对象的金额提供 <tt>public</tt> 访问。</p>
+
+<p class="docText">最有趣的改变在 <tt>Dollar::add()</tt> 方法中。这个方法不再是通过改变 <tt>$this->amount</tt> 的值，从而修改现有 <tt>Dollar</tt> 实例的状态，而是创建并返回一个新的 <tt>Dollar</tt> 实例。现在，即使你把这个对象赋值给多个变量，任何一个的改变都不会影响其它变量。</p>
+
+<p class="docText">不变性是 Value Object 模式的关键所在。任何对 Value Object 金额的改变，都是通过使用不同的期望值创建一个新的类的实例来完成的。在上面的例子中，<tt>$this->amount</tt> 永远不会改变。</p>
+
+<p class="docText">简单回顾一下，在 PHP5 中使用 Value Object 模式的基本原则就是：</p>
+
+<ol class="docList" TYPE="1">
+
+<li><p class="docList">保护 Value Object 的属性，禁止直接访问。</p></li>
+
+<li><p class="docList">在构造函数中设置对象属性。</p></li>
+
+<li><p class="docList">不要提供“setter”函数，否则它将允许属性被修改。</p></li>
+
+</ol>
+
+<p class="docText">这三个步骤创建了一个不变值 —— 一个在初始化设置后就不可以改变的值。当然，你也应该提供访问 Value Object 属性的“getter”或方法，以及任何与类有关的方法。此外，Value Object 也不必非得只能是一个简单结构，它也可以包含重要的业务逻辑。我们来看下一个例子。</p>
+
+
+<h4 class="docSection2Title">实际例子</h4>
+
+<p class="docText">我们再在一个更大的范例环境中研究 Value Object 模式，着手实现一个叫做 <tt>Monopoly</tt> 的游戏。这个游戏就建立在上文所创建的 PHP5 <tt>Dollar</tt> 类之上。</p>
+
+<p class="docText">第一个类是 <tt>Monopoly</tt>，它是一个基础框架：</p>
+
+<pre>
+class Monopoly {
+  protected $go_amount;
+
+  /**
+   * game constructor
+   * @return void
+   */
+  public function __construct() {
+    $this->go_amount = new Dollar(200);
+  }
+
+  /**
+   * pay a player for passing “Go”
+   * @param Player $player the player to pay
+   * @return void
+   */
+  public function passGo($player) {
+    $player->collect($this->go_amount);
+  }
+}
+</pre>
+
+<p class="docText">目前为止，<tt>Monopoly</tt> 类还很简单。构造函数创建 <tt>$go_amount</tt>，<tt>Dollar</tt> Value Object 类的一个实例，设置为 <tt>$200</tt>。 <tt>passGo()</tt> 使用 <tt>$go_amount</tt>，接受一个 <tt>Player</tt> 参数，并告诉 <tt>Player</tt> <tt>collect() $200</tt>。</p>
+
+<p class="docText"><tt>Player</tt> 是下一个应该实现的类。<tt>Monopoly</tt> 类调用 <tt>Player::collect()</tt> 方法，使用一个参数，<tt>Dollar</tt>，并把 <tt>Dollar</tt> 数额增加到玩家的现金余额。除了这个方法，我们还需要增加一个 <tt>Player::getBalance()</tt> 方法，用来访问玩家的当前现金储备，验证 <tt>Player</tt> 和 <tt>Monopoly</tt> 对象可以正常工作。</p>
+
+<pre>
+class Player {
+  protected $name;
+  protected $savings;
+
+  /**
+   * constructor
+   * set name and initial balance
+   * @param string $name the players name
+   * @return void
+   */
+  public function __construct($name) {
+    $this->name = $name;
+    $this->savings = new Dollar(1500);
+  }
+
+  /**
+   * receive a payment
+   * @param Dollar $amount the amount received
+   * @return void
+   */
+  public function collect($amount) {
+    $this->savings = $this->savings->add($amount);
+  }
+
+  /**
+   * return player balance
+   * @return float
+   */
+  public function getBalance() {
+    return $this->savings->getAmount();
+  }
+}
+</pre>
+
+<p class="docText">有了 <tt>Monopoly</tt> 和 <tt>Player</tt>，你现在可以为目前已经实现的类写一个测试用例了。<tt>MonopolyTestCase</tt> 看起来可能像：</p>
+
+<pre>
+class MonopolyTestCase extends UnitTestCase {
+  function TestGame() {
+    $game = new Monopoly;
+
+    $player1 = new Player('Jason');
+    $this->assertEqual(1500, $player1->getBalance());
+
+    $game->passGo($player1);
+    $this->assertEqual(1700, $player1->getBalance());
+
+    $game->passGo($player1);
+    $this->assertEqual(1900, $player1->getBalance());
+  }
+}
+</pre>
+
+<p class="docText">如果你运行 <tt>MonopolyTestCase</tt>，应该可以看到一个绿条。是时候继续增加功能了。</p>
+
+<p class="docText">支付租金是 <tt>Monopoly</tt> 游戏中另一个重要的概念。我们首先编写一个测试用例(测试驱动开发)，设定下个编码周期的目标：</p>
+
+<pre>
+function TestRent() {
+  $game = new Monopoly;
+
+  $player1 = new Player('Madeline');
+  $player2 = new Player('Caleb');
+  $this->assertEqual(1500, $player1->getBalance());
+  $this->assertEqual(1500, $player2->getBalance());
+
+  $game->payRent($player1, $player2, new Dollar(26));
+  $this->assertEqual(1474, $player1->getBalance());
+  $this->assertEqual(1526, $player2->getBalance());
+}
+</pre>
+
+<p class="docText">观察这个测试，可以看出，我们需要为 <tt>Monopoly</tt> 类增加一个 <tt>payRent()</tt> 方法，以允许一个玩家向另一个支付租金。</p>
+
+<pre>
+Class Monopoly {
+  // ...
+
+  /**
+   * pay rent from one player to another
+   * @param Player $from the player paying rent
+   * @param Player $to the player collecting rent
+   * @param Dollar $rent the amount of the rent
+   * @return void
+   */
+  public function payRent($from, $to, $rent) {
+    $to->collect($from->pay($rent));
+  }
+}
+</pre>
+
+<p class="docText"><tt>payRent()</tt> 完成了两个玩家，<tt>$from</tt> 和 <tt>$to</tt>，之间的交易。<tt>Player::collect()</tt> 已经有了，但还必须添加 <tt>Player::pay()</tt> 方法让 <tt>$from pay()</tt> 一个 <tt>Dollar</tt> 数额给 <tt>$to</tt>。<tt>Player::pay()</tt> 看起来可能像：</p>
+
+<pre>
+class Player {
+  // ...
+
+  public function pay($amount) {
+    $this->savings = $this->savings->add(-1 * $amount);
+  }
+}
+</pre>
+
+<p class="docText">不幸的是，在 PHP 中，不能用一个数字乘一个对象(不像有的编程语言，PHP 不允许操作符重载，它可以允许像这样的结构)。所以，我们为 <tt>Dollar</tt> 增加 <tt>debit()</tt> 方法以执行减操作。</p>
+
+<pre>
+class Dollar {
+  protected $amount;
+
+  public function __construct($amount = 0) {
+    $this->amount = (float)$amount;
+  }
+
+  public function getAmount() {
+    return $this->amount;
+  }
+
+  public function add($dollar) {
+    return new Dollar($this->amount + $dollar->getAmount());
+  }
+
+  <span class="docEmphStrong">public function debit($dollar) {
+    return new Dollar($this->amount - $dollar->getAmount());
+  }</span>
+}
+</pre>
+
+<p class="docText">有了 <tt>Dollar::debit()，Player::pay()</tt> 就很简单了：</p>
+
+<pre>
+class Player {
+  // ...
+
+  /**
+   * make a payment
+   * @param Dollar $amount the amount to pay
+   * @return Dollar the amount payed
+   */
+  public function pay($amount) {
+    $this->savings = $this->savings->debit($amount);
+    return $amount;
+  }
+}
+</pre>
+
+<p class="docText"><tt>Player::pay()</tt> 返回支付的 <tt>$amount</tt>，以便 <tt>Monopoly::payRent()</tt> 中的 <tt>$to->collect($from->pay($rent))</tt> 语句能适当地工作。如果你将来要改变“业务逻辑”，不允许一个支付大于玩家的余额，这是很有帮助的。(这种情况下将会返回玩家的余额，而且或许还会抛出一个“<tt>BankruptException</tt>”，计算一个修改后的支付代替完全的数额。毕竟，<tt>$to</tt> 玩家仍想从 <tt>$from</tt> 得到尽可能多的钱。)</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">术语 — Business Logic (业务逻辑)</p>
+
+<p class="docNoteText">建立一个游戏模型所指的“业务逻辑”似乎很难理解。这里的业务并不是指实际公司的商业行为，而是指应用程序所解决问题领域中的特定的概念。这里，应该把业务理解成“一个直接的任务或目标”，而不是“你所理解意义上的业务”。</p>
+
+<p class="docNoteText">当然了，对于 <tt>monopoly</tt> 这个游戏而言，“业务逻辑”的含义就是指的这个。</p>
+
+</div>
+
+<h4 class="docSection1Title">PHP4 范例代码</h4>
+
+<p class="docText">不像 PHP5，PHP4 按值拷贝对象的语法自然就与 Value Object 模式吻合。然而，因为 PHP4 不支持属性和方法可见性，所以在 PHP4 中实现 Value Object 也有它的细微差别。</p>
+
+<p class="docText">如果你回想一下，本书引言的“对象句柄”部分介绍了三条在 PHP4 中使用对象模拟 PHP5 的对象句柄时“几乎总是适用”的“规则”：</p>
+
+<ol class="docList" TYPE="1">
+
+<li><p class="docList">通过引用创建对象(<tt>$obj =& new Class;</tt>)</p></li>
+
+<li><p class="docList">通过引用传递对象(<tt>function funct(&$obj_param) {}</tt>)</p></li>
+
+<li><p class="docList">通过引用获取对象(<tt>function &some_funct() {} $returned_obj =& some_funct()</tt>)</p></li>
+
+</ol>
+
+<p class="docText">Value Object 模式对于这些规则的“几乎总是适用”部分是一个重要的例外。只要忽略这些规则，你就能总是得到 PHP4 对象的一个拷贝(相当于 PHP5 的“克隆”操作，如 <a class="docLink" target="_blank" href="http://www.php.net/manual/en/language.oop5.cloning.php">http://www.php.net/manual/en/language.oop5.cloning.php</a> 所述)。</p>
+
+<p class="docText">然而，PHP4 使对象拷贝轻而易举 —— 在语言中，它是固有的行为 —— 不变性只需按常规实现。在 PHP4 中创建 Value Object，永远不要通过引用创建或获取 Value Object，并为所有“<tt>private</tt>”属性或方法的名字添加一个下划线(<tt>_</tt>)前缀。于是，按照这种习惯，保存 Value Object 属性的变量也应该添加下划线前缀，以表明它是私有的。</p>
+
+<p class="docText">下面就是用 PHP4 实现的 <tt>Dollar</tt> 类：</p>
+
+<pre>
+// PHP4
+class Dollar {
+  var $_amount;
+
+  function Dollar($amount = 0) {
+    $this->_amount = (float)$amount;
+  }
+
+  function getAmount() {
+    return $this->_amount;
+  }
+
+  function add($dollar) {
+    return new Dollar($this->_amount + $dollar->getAmount());
+  }
+
+  function debit($dollar) {
+    return new Dollar($this->_amount - $dollar->getAmount());
+  }
+}
+</pre>
+
+<p class="docText">下面是一个测试用例，它说明了在 PHP4 中不能创建不变的属性：</p>
+
+<pre>
+function TestChangeAmount() {
+  $d = new Dollar(5);
+  $this->assertEqual(5, $d->getAmount());
+
+  //only possible in php4 by not respecting the _private convention
+  $d->_amount = 10;
+  $this->assertEqual(10, $d->getAmount());
+}
+</pre>
+
+<p class="docText">再次强调，在所有 PHP4 对象中，为 <tt>private</tt> 变量添加一个下划线前缀，而且不要直接访问这些 <tt>private</tt> 属性和方法。</p>
+
+
+<h4 class="docSection1Title">Value Object 中的业务逻辑</h4>
+
+<p class="docText">Value Objects 不必受限于只有很少 accessor 方法的简单数据结构；它们也可以包含有用的业务逻辑。考虑在一些人之间平均分钱的情况。</p>
+
+<p class="docText">如果金额正好除尽，那么你可以返回一个 <tt>Dollar</tt> 对象数组，而且每个 <tt>Dollar</tt> 都包含相等的部分。但是，如果金额不能等分成元和分呢？</p>
+
+<p class="docText">我们从编写一些简单的测试用例开始：</p>
+
+<pre>
+// PHP5
+function testDollarDivideReturnsArrayOfDivisorSize() {
+  $full_amount = new Dollar(8);
+  $parts = 4;
+  $this->assertIsA($result = $full_amount->divide($parts), 'array');
+  $this->assertEqual($parts, count($result));
+}
+</pre>
+
+<div class="docNote">
+
+<p class="docNoteTitle">assertIsA</p>
+
+<p class="docNoteText"><tt>assertIsA()</tt> 断言让你可以测试一个特定的变量是否是一个给定名字的类的一个实例(或子代)。你也可以用这个断言验证像字符串、数字或数组那样的 PHP 基本类型。</p>
+
+</div>
+
+<p class="docText">为了通过这个测试，<tt>Dollar::divide()</tt> 方法编码为 …</p>
+
+<pre>
+public function divide($divisor) {
+  return array_fill(0, $divisor, null);
+}
+</pre>
+
+<p class="docText">… 这样看来，再多增加一些细节会更好一点：</p>
+
+<pre>
+function testDollarDrivesEquallyForExactMultiple() {
+  $test_amount = 1.25;
+  $parts = 4;
+  $dollar = new Dollar($test_amount * $parts);
+  foreach ($dollar->divide($parts) as $part) {
+    $this->assertIsA($part, 'Dollar');
+    $this->assertEqual($test_amount, $part->getAmount());
+  }
+}
+</pre>
+
+<p class="docText">现在，返回的数组不仅要大小正确，而且还必须包含正确金额的 <tt>Dollar</tt> 对象。仍然可以用一行代码来实现：</p>
+
+<pre>
+public function divide($divisor) {
+  return array_fill(0, $divisor, new Dollar($this->amount / $divisor));
+}
+</pre>
+
+<p class="docText">最后要编写的功能是，处理由不能整除 <tt>Dolldar</tt> 金额的除数引起的舍入错误。这是一个棘手的问题：如果存在舍入情况，那么是第一部分，还是最后一部分得到那个额外的便士？如何才能独立于实现对它进行测试？</p>
+
+<p class="docText">一种方法是明确地列出代码的最终目标：数组的大小应该与部分数相等，任何部分不能相差 <tt>$0.01</tt>，并且所有部分的金额之和应该等于被除的金额值。</p>
+
+<p class="docText">表示成一个测试用例就是：</p>
+
+<pre>
+function testDollarDivideImmuneToRoundingErrors() {
+  $test_amount = 7;
+  $parts = 3;
+  $this->assertNotEqual(round($test_amount / $parts, 2),
+                        $test_amount / $parts,
+                        'Make sure we are testing a non-trivial case %s');
+
+  $total = new Dollar($test_amount);
+  $last_amount = false;
+  $sum = new Dollar(0);
+
+  foreach ($total->divide($parts) as $part) {
+    if ($last_amount) {
+      $difference = abs($last_amount - $part->getAmount());
+      $this->assertTrue($difference <= 0.01);
+    }
+    $last_amount = $part->getAmount();
+    $sum = $sum->add($part);
+  }
+
+  $this->assertEqual($sum->getAmount(), $test_amount);
+}
+</pre>
+
+<div class="docNote">
+
+<p class="docNoteTitle">assertNotEqual</p>
+
+<p class="docNoteText">如果前面两个参数满足 PHP 的 <tt>==</tt> 条件测试，<tt>assertNotEqual()</tt> 断言就会失败。任何时候，只要你需要确保两个值是不同的，你就可以用它。</p>
+
+</div>
+
+<p class="docText">有了一些测试用例在手，如何改进 <tt>Dollar::divide()</tt> 呢？</p>
+
+<pre>
+class Dollar {
+  protected $amount;
+
+  public function __construct($amount = 0) {
+    $this->amount = (float)$amount;
+  }
+
+  public function getAmount() {
+    return $this->amount;
+  }
+
+  public function add($dollar) {
+    return new Dollar($this->amount + $dollar->getAmount());
+  }
+
+  public function debit($dollar) {
+    return new Dollar($this->amount - $dollar->getAmount());
+  }
+
+  <span class="docEmphStrong">public function divide($divisor) {
+    $ret = array();
+    $alloc = round($this->amount / $divisor, 2);
+    $cumm_alloc = 0.0;
+    foreach (range(1, $divisor - 1) as $i) {
+      $ret[] = new Dollar($alloc);
+      $cumm_alloc += $alloc;
+    }
+    $ret[] = new Dollar(round($this->amount - $cumm_alloc, 2));
+    return $ret;
+  }</span>
+}
+</pre>
+
+<p class="docText">这段代码可以正常运行，但是仍然还存在一些问题。考虑一下边界条件的问题，比如，把 <tt>testDollarDivide()</tt> 的开头几行代码改为 <tt>$test_amount = 0.02; $num_parts = 5;</tt>。或考虑一下当提供的除数不是一个整数时又会怎样？</p>
+
+<p class="docText">应该用什么方法来解决像这样的问题呢？当然还是用测试驱动迭代开发的方法：增加一个测试用例，观察失败的情况，编写代码让这个新的测试用例通过，如果需要的话，就进行重构。如果还需要，则重复上述过程。</p>
+</span>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table></body>
+</html>

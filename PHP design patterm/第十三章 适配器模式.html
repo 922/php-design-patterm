@@ -1,0 +1,272 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第十三章 The Adapter Pattern —— 适配器模式</title>
+<link rel="stylesheet" type="text/css" href="styles/common.css" />
+<link rel="stylesheet" type="text/css" href="styles/docsafari.css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第十三章 The Adapter Pattern —— 适配器模式</h2>
+
+<p class="docText">接口改变，一个程序员不得不(虽然极不情愿)接受和应对的简单却又永久的现实。程序提供者改变他们的代码；系统程序库被修订；以及编程语言和它们所依托程序库的发展，所有这些都会引起接口改变。我儿子数不清的玩具之一简要地描述了这个难题：不能在一个圆孔中安装一根方桩。</p>
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">如何避免外部程序库的 API 改变所带来的不便？如果你在编写一个库，你能否提供一种方法，允许你的软件现有使用者无缝升级，即使你已经改变了你的 API？为了更好地适应你的需求，你应该如何改变一个对象的接口？</p>
+
+
+<h3 class="docSection1Title">解决方案</h3>
+
+<p class="docText">Adapter 模式为一个对象提供了一个不同的接口。你可以用一个 Adapter 为一个不同的对象实现一个熟悉的接口，从而避免了修改或重构你的客户代码的麻烦。想象一下，当(并不是假设哦！)一个第三方程序库的 API 发生改变的时候你该怎么办。你可以硬着头皮(咬紧牙关)，修改你的所有客户代码，但情况往往并非那么简单。比如，你可能正从事一个新的项目，它需要用到新版库的特性，但你又已经有了很多旧的遗留程序，而且，它们与以前的旧版程序库工作得很好。如果升级意味着也要触及所有其它程序的客户代码，你或许就无法证明这些新特性的价值了。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">Handle-Body Pattern(结构型模式)</p>
+
+<p class="docNoteText">Adapter 模式是最后一个结构型模式。Adapter 的结构类似于 Proxy 和 Decorator，但 Adapter 的目的是改变所封装对象的 API，而 Proxy 和 Decorator 则保持接口不变。</p>
+
+</div>
+
+
+<h3 class="docSection1Title">范例代码</h3>
+
+<p class="docText">我们就来看看，当 API 改变时，如何保护一个已有的应用程序不受影响。</p>
+
+<p class="docText">假设你费尽心思寻找合适的程序库，并最终找到了 <tt>HwLib</tt>，一组(假想的)设计来发送消息的代码。</p>
+
+<p class="docText">下面就是 <tt>HwLib</tt> 类的源代码：</p>
+
+<pre>
+// PHP4
+/**
+ * the HwLib helps programmers everywhere write their first program
+ * @package HelloWorld
+ * @version 1
+ */
+class HwLib {
+  /**
+   * Say &quot;Hello&quot;
+   * @deprec this function is going away in the future
+   * @return string
+   */
+  function hello() {
+    return 'Hello';
+  }
+
+  /**
+   * target audience
+   * @return string
+   */
+  function world() {
+    return 'World!';
+  }
+}
+</pre>
+
+<p class="docText">下面则是使用这个库的一个例子：</p>
+
+<pre>
+$hw =&amp; new HwLib;
+
+echo $hw-&gt;hello(), $hw-&gt;world();
+</pre>
+
+<p class="docText"><tt>HwLib</tt> 有良好的说明文档。作者甚至已经明确注明，在一个未来的版本中，<tt>hello()</tt> 方法将会不再被支持(甚至会被舍弃)。</p>
+
+<p class="docText">接下来，假设这个未来时刻已经来临，而且 <tt>HwLib v2</tt> 刚已经发布。一个全新的 <tt>greet()</tt> 方法取代了 <tt>hello()</tt>。</p>
+
+<p class="docText">下面就是这个新版库(注释已被去掉了)：</p>
+
+<pre>
+// version 2
+class HwLib {
+  function greet() {
+    return 'Greetings and Salutations';
+  }
+
+  function world() {
+    return 'World!';
+  }
+}
+</pre>
+
+<p class="docText">为了着手针对两个版本的 <tt>HwLib</tt> 编码，首先创建一些基于 <tt>HwLib v1</tt> 接口的测试：</p>
+
+<pre>
+class AdapterTestCase extends UnitTestCase {
+  function TestOriginalApp() {
+    $lib =&amp; new HwLib;
+    $this-&gt;assertEqual('Hello World!',
+                       $lib-&gt;hello().$lib-&gt;world());
+  }
+}
+</pre>
+
+<p class="docText">你也可以说明，如果只是单单地升级库，将会引起程序出错。</p>
+
+<pre>
+class AdapterTestCase extends UnitTestCase {
+  function TestOriginalAppWouldFail() {
+    <span class="docEmphStrong">$lib =&amp; new HwLib; // now using HwLib version 2</span>
+    $this-&gt;assertFalse(method_exists($lib, 'hello'));
+  }
+}
+</pre>
+
+<p class="docText">(这个测试用 <tt>method_exists()</tt> 为例。如果你只是切换到这个库的第 2 版，并使用 <tt>TestOriginalApp()</tt> 测试重新运行 <tt>AdapterTestCase</tt>，PHP 就会报错：<tt>Fatal error: Call to undefined function: hello()</tt>。)</p>
+
+<p class="docText">针对 API“升级”的解决方案就是建立一个 Adapter。 </p>
+
+<p class="docText">第一步是把一个 <tt>HwLib v2</tt> 实例的引用传到你的 Adapter 类中。</p>
+
+<pre>
+class HwLibV2ToV1Adapter {
+  var $libv2;
+
+  <span class="docEmphStrong">function HwLibV2ToV1Adapter (&amp;$libv2) {
+    $this-&gt;libv2 =&amp; $libv2;
+  }</span>
+}
+</pre>
+
+<p class="docText">这个例子显示实例是被传递到构造函数的，但你完全可以创建一个新的实例，使用一个 Factory 或一个 Singleton，或其它适合你程序的创建型模式。(经过前两章之后，你似乎应该对 <tt>HwLibV2ToV1Adapter</tt> 中组合的用法很熟悉了吧。)</p>
+
+<p class="docText">有了 <tt>HwLib v2</tt> 对象，如何使它以一个 <tt>HwLib v1</tt> 实例的身份出现呢？</p>
+
+<pre>
+class HwLibV2ToV1Adapter {
+  var $libv2;
+
+  function HwLibV2ToV1Adapter(&amp;$libv2) {
+    $this-&gt;libv2 =&amp; $libv2;
+  }
+<span class="docEmphStrong">
+  function hello() {
+    return $this-&gt;libv2-&gt;greet();
+  }
+</span>
+  function world() {
+    return $this-&gt;libv2-&gt;world();
+  }
+}
+</pre>
+
+<p class="docText"><tt>HwLibV2ToV1Adapter::hello()</tt> 方法委托给了 <tt>$libv2</tt> 对象的 <tt>greet()</tt> 方法。那么，如何在你的程序中使用这个方法呢？</p>
+
+<pre>
+class AdapterTestCase extends UnitTestCase {
+  function TestOriginalAppWithAdapter() {
+    <span class="docEmphStrong">$lib =&amp; new HwLibV2ToV1Adapter(new HwLib);</span>
+    $this-&gt;assertEqual('Greetings and Salutations World!',
+                       $lib-&gt;hello().$lib-&gt;world());
+  }
+}
+</pre>
+
+<p class="docText">但是，现在的测试程序和程序代码都还有一点脆弱。有没有方法可以使它们最后更容易维护呢？当然！</p>
+
+<p class="docText">回想一下 Factory(第 3 章) 是如何提供一个更加灵活的方法来创建对象实例的。为了得到更好的“经得起时间考验的”代码，就以一个简单的 Factory 函数开始：</p>
+
+<pre>
+function &amp;HwLibInstance() {
+  return new HwLib;
+}
+</pre>
+
+<p class="docText">为了测试 Factory，调用它来代替直接创建实例：</p>
+
+<pre>
+class AdapterTestCase extends UnitTestCase {
+  function TestAppWithFactory() {
+    <span class="docEmphStrong">$lib =&amp; HwLibInstance();</span>
+    <span class="docEmphStrong">$this-&gt;assertWantedPattern</span>('/\w+ World!$/',
+                               $lib-&gt;hello().$lib-&gt;world());
+  }
+}
+</pre>
+
+<p class="docText">需要注意两个方面：用 Factory 创建对象，以及 <tt>assertEqual()</tt> 验证已经改为了更加灵活的 <tt>assertWantedPattern()</tt>。现在，你可以使用一个正则表达式来捕捉你要从库中查找的“<tt>core</tt>”(核心)，这样或许能降低测试本身的脆弱性。</p>
+
+<p class="docText">接下来，升级 <tt>HwLib</tt> 库。当你安装好了 <tt>HwLib v2</tt>，你就可以修改 <tt>HwLibInstance()</tt> 函数来提供新的版本了：</p>
+
+<pre>
+function &amp;HwLibInstance($ver = false) {
+  switch ($ver) {
+    case 'V2':
+      return new HwLib;
+    default:
+      <span class="docEmphStrong">return new HwLibV2ToV1Adapter(new HwLib);</span>
+  }
+}
+</pre>
+
+<p class="docText">现在，重新运行 <tt>AdapterTestCase</tt>。测试又通过了！(绿条万岁！)因为最初的程序调用并没有传递一个参数，因此 <tt>HwLibInstance()</tt> Factory 需要默认返回一个包装在 <tt>HwLibV2toV1Adapter</tt> 类中的 <tt>HwLib</tt> 实例。然而，如果你是在编写新的代码，可以直接传递一个参数‘<tt>V2</tt>’，让这个函数知道你需要新版的 <tt>HwLib</tt>，而不用调整它。</p>
+
+<p class="docText">将来，如果你选择升级到 <tt>HwLib v3</tt>，Factory 可能会变成这个样子：</p>
+
+<pre>
+function &amp;HwLibInstance($ver = false) {
+  switch ($ver) {
+    case 'V3':
+      return new HwLib;
+    case 'V2':
+      return new HwLibV3ToV2Adapter(new HwLib);
+    default:
+      return new HwLibV2ToV1Adapter(new HwLibV3ToV2Adapter(new HwLib));
+  }
+}
+</pre>
+
+
+<h3 class="docSection1Title">小结</h3>
+
+<p class="docText">如范例代码所示，你可以用 Adapter 模式来保护你自己免于外部程序库的改变 —— 提供向前兼容性。身为一个库的一个开发者，你也可以自己编写适配器，给你的库的使用者提供一个简单的，不需要改变他们所有的现有代码，就可以使用新版库的方法。</p>
+
+<p class="docText">GoF 中所介绍的 Adapter 模式使用的是继承而非组合。这在强类型语言中是有利的，因为这样的话，Adapter 实际上就是目标类的子类，因此可以更好地和类型化方法结合。</p>
+
+<p class="docText">下面就是一个使用继承的 <tt>HwLib</tt> 适配器的例子：</p>
+
+<pre>
+class HwLibGofAdapter extends HwLib { // extending version 2.0
+  function hello() {
+    return parent::greet();
+  }
+}
+</pre>
+
+<p class="docText">没有提供 <tt>world()</tt> 方法，因为由于继承，它已经是子类的一部分了。</p>
+
+<pre>
+class AdapterTestCase extends UnitTestCase {
+  function TestHwLibGofAdapter() {
+    $lib =&amp; new HwLibGofAdapter;
+    $this-&gt;assertEqual('Greetings and Salutations World!',
+                       $lib-&gt;hello().$lib-&gt;world());
+  }
+}
+</pre>
+
+<p class="docText">为了得到更大的灵活性，我个人比较倾向于组合方式(尤其是结合依赖倒置的情况)；然而，继承方式确实提供了两个版本的接口。在你自己的实现中，这或许是一个需要灵活考虑的地方。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">Dependency Inversion Principle(依赖倒置原则)</p>
+
+<p>依赖倒置原则(由 Robert C. Martin 最初在 <a class="docLink" target="_blank" href="http://www.objectmentor.com/resources/articles/dip.pdf">http://www.objectmentor.com/resources/articles/dip.pdf</a> 提出)，是一个 OOP 指导原则，它表明：高层模块不应该依赖于低层模块，而且细节应该依赖抽象。<a class="docLink" target="_blank" href="http://www.phplondon.org/wiki/DependencyInversion">http://www.phplondon.org/wiki/DependencyInversion</a> 有一个简单的依赖倒置原则与 Adapter 模式结合的例子。</p>
+
+</div>
+
+<p class="docText">Adapter 模式集中于为单个对象修改 API。有一个与之相关的设计模式(不过，本书没有包含)，叫做 Facade(外观)。Facade 的目的是给由许多对象组成的整个子系统提供一个较简单的接口 —— 正好和封装单个类形成对比 —— 如果你正尝试将你的代码与第三方程序库隔离，那么这可能是一个值得研究的模式。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

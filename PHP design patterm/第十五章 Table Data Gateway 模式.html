@@ -1,0 +1,517 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第十五章 The Table Data Gateway Pattern —— Table Data Gateway 模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第十五章 The Table Data Gateway Pattern —— Table Data Gateway 模式</h2>
+
+<p class="docText">前一章使用了 Active Recorde 模式在数据库中创建、读取、更新、(删除，需要扩展实现)单个记录行。Active Recorde 是最简单的数据库通信抽象方式之一，不过这种简单性也正是它的弱点。一个 Active Recorde 类只能处理一个记录行，使得它不能胜任那些需要呈现大量信息的 web 应用程序，比如旅游登记或在线购物那样的程序。在这类程序中 —— 很可能占了大半的 web 应用程序 —— 结果集是当前更通用的形式。</p>
+
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">如何才能方便地操纵一个数据库表和其中的所有记录？</p>
+
+
+<h3 class="docSection1Title">解决方案</h3>
+
+<p class="docText">Table Data Gateway 模式与 Active Recorde 模式相似。实际上，这个新模式的许多代码都是从第 14 章 —— Active Recorde 模式，借用过来的(它重用了完全相同的 <tt>DB</tt> 类和 <tt>BOOKMARK_TABLE_DDL</tt> 常量，而且和之前一样，也是用 <tt>ADOdb</tt> 作数据库访问程序库)。然而，Table Data Gateway 模式关注的是表 —— 记录集 —— 而非单个记录行。</p>
+
+
+<h3 class="docSection1Title">范例代码</h3>
+
+<p class="docText">我们从创建操作开始，该操作用于给一个表增加新记录。</p>
+
+<p class="docText">测试用例方法 <tt>TableDataGatewayTestCase::testAdd()</tt> 显示了添加两条 <tt>URL</tt> 到 <tt>bookmark</tt> 表所需的步骤。它很大程度上参照了第 14 章的 <tt>ActiveRecordTestCase::testAdd()</tt>，但又是截然不同的，因为它引入了新的 Table Data Gateway 类，<tt>BookmarkGateway</tt>。</p>
+
+<pre>
+class TableDataGatewayTestCase extends UnitTestCase {
+  function testAdd() {
+    <span class="docEmphStrong">$gateway = new BookmarkGateway($conn = DB::conn());</span>
+    $gateway-&gt;add('http://simpletest.org/',
+                  'SimpleTest',
+                  'The SimpleTest homepage',
+                  'testing');
+    $gateway-&gt;add('http://blog.casey-sweat.us/',
+                  'My Blog',
+                  'Where I write about stuff',
+                  'php');
+
+    $rs = $this-&gt;conn-&gt;execute('select * from bookmark');
+    $this-&gt;assertEqual(2, $rs-&gt;recordCount());
+    $this-&gt;assertEqual(2, $conn-&gt;Insert_ID());
+  }
+}
+</pre>
+
+<p class="docText">与 Active Record 相似，<tt>TableDataGatewayTestCase</tt> 首先实例化模式类，然后把一些记录增加到数据库。然而，因为 Table Data Gateway 模式工作在整个表之上，所以你只需要创建一个模式对象，然后就可以重用这个对象，增加任何数量的新记录到它的表。</p>
+
+<p class="docText">下面就是 <tt>BookmarkGateway</tt> 的一个可能的实现：</p>
+
+<pre>
+class BookmarkGateway {
+  const INSERT_SQL = &quot;insert into bookmark (url, name, description,
+    tag, created, updated) values (?, ?, ?, ?, now(), now())&quot;;
+
+  protected $conn;
+
+  public function __construct($conn) {
+    $this-&gt;conn = $conn;
+  }
+
+  public function add($url, $name, $description, $group) {
+    $rs = $this-&gt;conn-&gt;execute(self::INSERT_SQL,
+                               array($url, $name, $description, $group));
+    if (!$rs) {
+      trigger_error('DB Error: '.$this-&gt;conn-&gt;errorMsg());
+    }
+  }
+}
+</pre>
+
+<p class="docText">这里的许多代码都可能看起来很熟悉，因为 Active Record 模式和 Table Data Gateway 模式的“基本框架”相似：<tt>INSERT_SQL</tt> 语句，函数参数表，数据库错误处理，所有这些都与 Active Record 相同。另外，<tt>add()</tt> 也是一次创建一条记录。</p>
+
+<p class="docText">实现了 CRUD 的“创建”操作，是时候实现“获取”操作了。</p>
+
+
+<h4 class="docSection2Title">测试用例结构</h4>
+
+<p class="docText">因为 Table Data Gateway 的目的是处理一个包含多条记录的数据库表，你很可能需要在运行每个测试之前，用一个方便的方法来将表初始化到一个已知的状态。一个快捷的解决方案是为你的所有测试创建一个基类，包含两个辅助方法，<tt>setup()</tt> 和 <tt>addSeveralBookmarks()</tt>，分别用来重建表和增加一些数据。</p>
+
+<p class="docText">下面的 <tt>BaseTestCase</tt> 就是一个这样的类：</p>
+
+<pre>
+class BaseTestCase extends UnitTestCase {
+  protected $conn;
+
+  function __construct($name = '') {
+    $this-&gt;UnitTestCase($name);
+    $this-&gt;conn = DB::conn();
+  }
+
+  function setup() {
+    $this-&gt;conn-&gt;execute('drop table bookmark');
+    $this-&gt;conn-&gt;execute(BOOKMARK_TABLE_DDL);
+  }
+
+  function addSeveralBookmarks($gateway) {
+    // add(url, name, desc, tag)
+    $gateway-&gt;add(
+      'http://blog.casey-sweat.us/',
+      'Jason\'s Blog',
+      'PHP related thoughts',
+      'php'
+    );
+    $gateway-&gt;add(
+      'http://www.php.net/',
+      'PHP homepage',
+      'The main page for PHP',
+      'php'
+    );
+    $gateway-&gt;add(
+       'http://slashdot.org/',
+       '/.',
+       'News for Nerds',
+       'new'
+    );
+    $gateway-&gt;add(
+      'http://google.com/',
+      'Google',
+      'Google Search Engine',
+      'web'
+    );
+    $gateway-&gt;add(
+      'http://www.phparch.com/',
+      'php|architect',
+      'The home page of php|architect, an outstanding monthly PHP publication',
+      'php'
+    );
+  }
+}
+</pre>
+
+<p class="docText">现在，每个从 <tt>BaseTestCase</tt> 派生的测试用例都继承了它的构造函数，<tt>setup()</tt> 方法，和用于预装一些数据的 <tt>addSeveralBookmarks()</tt> 方法。</p>
+
+
+<h4 class="docSection2Title">以数组的形式返回记录集</h4>
+
+<p class="docText">不管什么时候实现 Table Data Gateway 类，都必须选择一种数据结构来代表从访问方法返回的结果集。在 PHP 中，一个非常普遍的习惯是返回一个记录行哈希向量(一个从 0 开始索引的数组)，由域值对(<tt>field =&gt; value</tt>)组成的联合数组。</p>
+
+<p class="docText">在 <tt>BookmarkGateway</tt> 中，从 <tt>ADOConnection</tt> 得到这样一个数据结构非常容易，因为 <tt>ADOResultSet::getArray()</tt> 方法采用的就是完全相同的习惯。</p>
+
+<p class="docText">例如，下面就是一个 <tt>findAll()</tt> 方法，它返回 <tt>Table Data Gateway</tt> 类的表的全部内容：</p>
+
+<pre>
+class BookmarkGateway {
+  // ...
+
+  public function findAll() {
+    $rs = $this-&gt;conn-&gt;execute('select * from bookmark');
+    if ($rs) {
+      <span class="docEmphStrong">return $rs-&gt;getArray();</span>
+    } else {
+      trigger_error('DB Error: '.$this-&gt;conn-&gt;errorMsg());
+    }
+  }
+}
+</pre>
+
+<p class="docText">不管简单与否，都需要测试一下：</p>
+
+<pre>
+class TableDataGatewayTestCase extends BaseTestCase {
+  // ...
+
+  function testFindAll() {
+    $gateway = new BookmarkGateway(DB::conn());
+    $this-&gt;addSeveralBookmarks($gateway);
+
+    $result = $gateway-&gt;findAll();
+
+    $this-&gt;assertIsA($result, 'Array');
+    $this-&gt;assertEqual(5, count($result));
+  }
+}
+</pre>
+
+<p class="docText">如果想更进一步，还可以检测一些单独的返回记录：</p>
+
+<pre>
+class TableDataGatewayTestCase extends BaseTestCase {
+  // ...
+
+  function testFindAll() {
+    $gateway = new BookmarkGateway(DB::conn());
+    $this-&gt;addSeveralBookmarks($gateway);
+
+    $result = $gateway-&gt;findAll();
+    $this-&gt;assertIsA($result, 'Array');
+    $this-&gt;assertEqual(5, count($result));
+
+    <span class="docEmphStrong">$this-&gt;assertIsA($result[0], 'Array');</span>
+    <span class="docEmphStrong">$this-&gt;assertEqual(7, count($result[1]));</span>
+
+    $expected_keys = array('id',
+                           'url',
+                           'name',
+                           'description',
+                           'tag',
+                           'created',
+                           'updated');
+    <span class="docEmphStrong">$this-&gt;assertEqual($expected_keys,
+                       array_keys($result[3]));
+  }</span>
+}
+</pre>
+
+<p class="docText">(索引 0、1、3 是随机选择的，可以用 5 个返回记录行中的任何一个)，因为返回集中的值就是你最初存储的值(这正是我们所假设的)，所以你也可以创建测试来直接比较它们：</p>
+
+<pre>
+class TableDataGatewayTestCase extends BaseTestCase {
+  // ...
+
+  function testFindAll() {
+    $gateway = new BookmarkGateway(DB::conn());
+    $this-&gt;addSeveralBookmarks($gateway);
+
+    $result = $gateway-&gt;findAll();
+
+    // ...
+
+    <span class="docEmphStrong">$this-&gt;assertEqual('PHP homepage', $result[1]['name']);</span>
+    <span class="docEmphStrong">$this-&gt;assertEqual('http://google.com/', $result[3]['url']);</span>
+  }
+}
+</pre>
+
+
+<h4 class="docSection2Title">返回可迭代的对象集合</h4>
+
+<p class="docText">数组是一个 PHP 内置类型，大量的 PHP 数组函数使它们在程序中很容易使用。然而，你也可能想以对象集合的形式返回结果集。实际上，返回数据传输对象(基本的值容器，也可以包含少许其它逻辑)集合是很普遍的做法 —— 甚至于 <tt>ADOResultSet()</tt> 方法就是为这个目的而提供的。我们来创建一个查找方法，基于表的‘<tt>tag</tt>’字段值来查找记录。因为这个例子是在 PHP5 中，也可以让返回的结果集为可迭代的(见第 8 章 —— Iterator 模式)，这样就可用于 PHP 的 <tt>foreach</tt> 结构了。</p>
+
+<p class="docText">(<tt>ADOdb</tt> 默认返回数据行散列数组。我有意使这个例子更加复杂一点，强制其返回数据传输对象，这样代码就有趣多了。而且，如你所见，这个示范解决方案应用了一些在本书前面学习过的设计模式)</p>
+
+<p class="docText">下面以一个测试更加简单地说明了这些(可能的)需求：</p>
+
+<pre>
+class TableDataGatewayTestCase extends BaseTestCase {
+  // ...
+
+  function testFindByTag() {
+    $gateway = new BookmarkGateway(DB::conn());
+    $this-&gt;addSeveralBookmarks($gateway);
+
+    $result = $gateway-&gt;findByTag('php');
+    $this-&gt;assertIsA($result, 'AdoResultSetIteratorDecorator');
+
+    $count=0;
+    foreach ($result as $bookmark) {
+      ++$count;
+      $this-&gt;assertIsA($bookmark, 'ADOFetchObj');
+    }
+    $this-&gt;assertEqual(3, $count);
+  }
+}
+</pre>
+
+<p class="docText">findByTag() 实现如下：</p>
+
+<pre>
+class BookmarkGateway {
+  // ...
+
+  public function findByTag($tag) {
+    $rs = $this-&gt;conn-&gt;execute(
+      'select * from bookmark where tag like ?',
+      array($tag.'%')
+    );
+    <span class="docEmphStrong">return new AdoResultSetIteratorDecorator($rs);</span>
+  }
+}
+</pre>
+
+<p class="docText">典型的，<tt>findByTag()</tt> 首先调用 <tt>execute()</tt> 生成一个结果集。<tt>ADOdb execute()</tt> 方法接受一个 <tt>SQL</tt> 语句，和一个可选的绑定了变量的数组参数来执行。因为 <tt>findByTag()</tt> 需要 <tt>LIKE</tt> 操作符，同时因为 <tt>ADOdb</tt> 会自动为查询字符串添加引号，所以需要在变量后面附加 <tt>%</tt> 符号，而不是在绑定数组中。</p>
+
+<p class="docText"><tt>execute()</tt> 方法产生一个结果集，然后由 <tt>AdoResultSetIteratorDecorator()</tt> 封装，这是接下来要编写的代码。从 <tt>AdoResultSetIteratorDecorator()</tt> 的名字可以看出，它的目的就是把结果集“转换”为一个可迭代的对象集合。</p>
+
+<p class="docText">通过包含 <span class="docEmphasis">adodb-iterator.inc.php</span> 文件，<tt>ADOdb</tt> 提供了对迭代的支持。这个文件中定义了一个 <tt>ADODB_Iterator</tt> 类，其本质就是把 <tt>ADOResultSet</tt> 装饰成 PHP5 SPL 迭代器接口。这允许你快速提供一个可遍历(foreach-able)结果集。然而，如你从以下这个新的测试用例所见，迭代器的默认行为是返回一个联合数组：</p>
+
+<pre>
+class AdoResultSetIteratorDecoratorTestCase extends BaseTestCase {
+  function testADOdbDecorator() {
+    $gateway = new BookmarkGateway($this-&gt;conn);
+    $this-&gt;addSeveralBookmarks($gateway);
+
+    $rs = $this-&gt;conn-&gt;execute('select * from bookmark');
+    foreach($rs as $row) {
+      $this-&gt;assertIsA($row, 'array');
+      <span class="docEmphStrong">$this-&gt;assertIsA($rs-&gt;fetchObj(), 'ADOFetchObj');</span>
+    }
+  }
+}
+</pre>
+
+<p class="docText">这里，首先建立了一个表，然后填充了一些记录，最后使用 <tt>ADOdb</tt> 迭代器进行遍历。</p>
+
+<p class="docText">突出显示的代码实际上是无效的，要注意避免。的确，你可以为每个数据行返回一个对象，但是那样你就不得不在程序中到处重复这样笨拙的代码来遍历结果集。</p>
+
+<p class="docText">一个好得多的解决方法 —— 能直接满足一个可迭代对象集合的要求 —— 是装饰 <tt>ADOdb</tt> 迭代器。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">测试外部程序库</p>
+
+<p class="docNoteText">写一些简单的测试用例能够帮助你研究第三方的程序库，更好地理解它的特性。成批的测试用例还可以捕捉依赖关系，或说明你的代码是如何明确地使用这个库的。这样，如果程序库在升级的过程中有所改变，你就能够快速地找到并解决问题。</p>
+
+<p class="docNoteText">如果你担心这种对外部程序库的依赖性，那么适合用一个 Adapter(见第 13 章 —— 适配器模式) 将你的代码与这种依赖关系隔离开来。</p>
+
+</div>
+
+<p class="docText">让我们编写一个测试用例来说明迭代器是如何工作的：</p>
+
+<pre>
+class AdoResultSetIteratorDecoratorTestCase extends BaseTestCase {
+  // ...
+
+  function testRsDecorator() {
+    $gateway = new BookmarkGateway($this-&gt;conn);
+    $this-&gt;addSeveralBookmarks($gateway);
+
+    $rs = $this-&gt;conn-&gt;execute('select * from bookmark');
+
+    $count = 0;
+    foreach (new AdoResultSetIteratorDecorator($rs) as $bookmark) {
+      ++$count;
+      $this-&gt;assertIsA($bookmark, 'ADOFetchObj');
+      $this-&gt;assertTrue($bookmark-&gt;id &gt; 0);
+      $this-&gt;assertTrue(strlen($bookmark-&gt;url) &gt; 10);
+    }
+    $this-&gt;assertEqual(5, $count);
+  }
+}
+</pre>
+
+<p class="docText">下面的代码说明了如何装饰 <tt>ADODB_Iterator</tt> 以满足测试需求：</p>
+
+<pre>
+require_once 'adodb/adodb-iterator.inc.php';
+
+class AdoResultSetIteratorDecorator implements Iterator {
+  protected $rs;
+
+  public function __construct($rs) {
+    $this-&gt;rs = new ADODB_Iterator($rs);
+  }
+
+  <span class="docEmphStrong">public function current() {
+    return $this-&gt;rs-&gt;fetchObj();
+  }</span>
+
+  public function next() {
+    return $this-&gt;rs-&gt;next();
+  }
+
+  public function key() {
+    return $this-&gt;rs-&gt;key();
+  }
+
+  public function valid() {
+    return $this-&gt;rs-&gt;valid();
+  }
+
+  public function rewind() {
+    return $this-&gt;rs-&gt;rewind();
+  }
+}
+</pre>
+
+<p class="docText">这里，大多数 Iterator 接口方法都被代理给了被装饰的结果集，但是重载了 <tt>current()</tt> 方法，它返回 <tt>fetchObj()</tt> 方法执行的结果。</p>
+
+<p class="docText">回到 Table Data Gateway，现在，你应该已经清楚 <tt>findByTag()</tt> 的工作原理了。</p>
+
+<pre>
+class BookmarkGateway {
+  // ...
+
+  public function findByTag($tag) {
+    $rs = $this-&gt;conn-&gt;execute(
+      'select * from bookmark where tag like ?',
+      array($tag.'%')
+    );
+
+    return new AdoResultSetIteratorDecorator($rs);
+  }
+}
+</pre>
+
+<h4 class="docSectioon2Title">更新记录</h4>
+
+<p class="docText">下一步，让我们来解决 CRUD 的“更新”功能。从概念上可以看出，需要填充表，查找一个对象，改变它，存储它，然后再查找它来验证改变已经被保存了。 </p>
+
+<p class="docText">回到 <tt>TableDataGatewayTestCase</tt>，下面就是用来查找一个记录的代码 …</p>
+
+<pre>
+class TableDataGatewayTestCase extends BaseTestCase {
+  // ...
+
+  function testUpdate() {
+    $gateway = new BookmarkGateway(DB::conn());
+    $this-&gt;addSeveralBookmarks($gateway);
+
+    $result = $gateway-&gt;findByTag('php');
+    <span class="docEmphStrong">$bookmark = $result-&gt;current();</span>
+
+    $this-&gt;assertIsA($bookmark, 'ADOFetchObj');
+    $this-&gt;assertEqual('http://blog.casey-sweat.us/',
+                       $bookmark-&gt;url);
+    $this-&gt;assertEqual('PHP related thoughts',
+                       $bookmark-&gt;description);
+  }
+}
+</pre>
+
+<p class="docText">… 用来改变它的代码：</p>
+
+<pre>
+class TableDataGatewayTestCase extends BaseTestCase {
+  // ...
+
+  function testUpdate() {
+    $gateway = new BookmarkGateway(DB::conn());
+    $this-&gt;addSeveralBookmarks($gateway);
+
+    $result = $gateway-&gt;findByTag('php');
+    $bookmark = $result-&gt;current();
+
+    $this-&gt;assertIsA($bookmark, 'ADOFetchObj');
+    $this-&gt;assertEqual('http://blog.casey-sweat.us/',
+                       $bookmark-&gt;url);
+    $this-&gt;assertEqual('PHP related thoughts',
+                       $bookmark-&gt;description);
+
+    <span class="docEmphStrong">$new_desc = 'A change to see it is updated!';</span>
+    <span class="docEmphStrong">$bookmark-&gt;description = $new_desc;</span>
+    <span class="docEmphStrong">$gateway-&gt;update($bookmark);</span>
+  }
+}
+</pre>
+
+<p class="docText">改变了记录之后，再次查找它以验证改变：</p>
+
+<pre>
+class TableDataGatewayTestCase extends BaseTestCase {
+  // ...
+
+  function testUpdate() {
+    $gateway = new BookmarkGateway(DB::conn());
+    $this-&gt;addSeveralBookmarks($gateway);
+
+    $result = $gateway-&gt;findByTag('php');
+    $bookmark = $result-&gt;current();
+
+    $this-&gt;assertIsA($bookmark, 'ADOFetchObj');
+    $this-&gt;assertEqual('http://blog.casey-sweat.us/',
+                       $bookmark-&gt;url);
+    $this-&gt;assertEqual('PHP related thoughts',
+                       $bookmark-&gt;description);
+
+    $new_desc = 'A change to see it is updated!';
+    $bookmark-&gt;description = $new_desc;
+    $gateway-&gt;update($bookmark);
+
+    <span class="docEmphStrong">$result = $gateway-&gt;findByTag('php');</span>
+    <span class="docEmphStrong">$bookmark = $result-&gt;current();</span>
+
+    <span class="docEmphStrong">$this-&gt;assertEqual('http://blog.casey-sweat.us/',
+                       $bookmark-&gt;url);</span>
+    <span class="docEmphStrong">$this-&gt;assertEqual($new_desc,
+                       $bookmark-&gt;description);</span>
+  }
+}
+</pre>
+
+<p class="docText">有了这些测试用例，是时候为 <tt>BookmarkGateway</tt> 增加 <tt>update()</tt> 方法了：</p>
+
+<pre>
+class BookmarkGateway{
+  // ...
+
+  <span class="docEmphStrong">const UPDATE_SQL = 'update bookmark set url = ?,
+                                          name = ?,
+                                          description = ?,
+                                          tag = ?,
+                                          updated = now() where id = ?';</span>
+
+  <span class="docEmphStrong">public function update($bookmark) {
+    $this-&gt;conn-&gt;execute(self::UPDATE_SQL,
+                         array($bookmark-&gt;url,
+                               $bookmark-&gt;name,
+                               $bookmark-&gt;description,
+                               $bookmark-&gt;tag,
+                               $bookmark-&gt;id));
+  }</span>
+}
+</pre>
+
+<p class="docText"><tt>BookmarkGateway </tt>既知道如何执行 <tt>SQL</tt> 来更新数据，也能正确地把数据传输对象的属性值映射到 <tt>SQL</tt> 语句的相应参数。</p>
+
+
+<h3 class="docSection1Title">小结</h3>
+
+<p class="docText">Table Data Gateway 用于操作表，非常适合 web 应用程序中执行的相关工作。然而，Table Data Gateway 与数据库表的结构仍然紧密耦合。将代码与数据库结构分离是下一章，Data Mapper 模式，的主题。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

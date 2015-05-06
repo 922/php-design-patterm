@@ -1,0 +1,527 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第七章 The Strategy Pattern —— 策略模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第七章 The Strategy Pattern —— 策略模式</h2>
+
+<p class="docText">在开发面向对象的代码的时候，有时需要对象基于环境而稍微改变它的行为。例如，一个 <tt>Menu</tt>(菜单) 能够根据使用者对“皮肤”(译者注：指软件的用户交互界面)的偏爱决定是水平还是垂直显示，又或一个 <tt>Order</tt>(订单) 可能基于客户的送货地址而不同地计算销售税。</p>
+
+<p class="docText">像 <tt>Menu</tt> 那样的对象的一个典型的实现包含 <tt>add()</tt>、<tt>delete()</tt> 和 <tt>replace()</tt> 菜单选项，<tt>set()</tt> 风格，以及 <tt>render()</tt> 它自己的方法。不管你想创建哪种菜单，<tt>Menu</tt> 提供了一个一致的接口；只有那么一两个方法的内部算法不同 —— 例如，至少包括 <tt>render()</tt>。</p>
+
+<p class="docText">但是，比如说，当菜单样式的数目扩充时会怎样？或则，在 <tt>Order</tt> 的例子中，当国家、州以及外国税规则被纳入计算时又会怎样？如果很多方法都包含执行特定选择的分支语句，那么本来简单的封装很快就会变得令人费解，难以阅读，难以维护。</p>
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">如何轻松地改变一个对象的内部实现，在脚本执行时选择使用一种实现，而不是在编写的时候？如何编写一系列易于维护和扩展的实现？</p>
+
+
+<h3 class="docSection1Title">解决方法</h3>
+
+<p class="docText">当一个类封装了多种实现，而且一个实例可以动态选择这些实现的任何一个的时候，可以使用 Strategy 模式分离对象和它的算法。或者，简言之，如果类的方法普遍地使用分支语句，那么重构为 Strategy 模式是一种不错的选择。</p>
+
+<p class="docText">Strategy 设计模式非常强大，因为它的核心思想就是在 OOP 中占首要位置的多态性(polymorphism)。</p>
+
+<p class="docText">在编程领域之外也有明显的 Strategy 模式的例子。如果我需要在早晨从家去公司，我可以在几种策略之间选择：我可以驾车、乘巴士、步行、骑车或甚至开直升机。每个策略都可以得到相同的结果，但它们使用了不同的资源，而且策略的选择取决于费用、时间、特定资源的可用性(如是否拥有一架直升机)和每种方法的方便程度。某一天看起来不错的策略可能第二天就会变得很糟糕了，因此，策略的选择必须动态地进行。</p>
+
+<p class="docText">你已经在关于 Factory 模式那章见到了与 Strategy 模式相似的例子：因为不同道具的租金计算方式变化很大，所以 <tt>Monopoly</tt> 游戏框架使用了一系列相似的道具类。然而，因为租金的计算并不是萃取到各自的类中，所以租金计算实际上是采用的 TemplateMethod 模式。</p>
+
+
+<h3 class="docSection1Title">范例</h3>
+
+
+<p class="docText">举一个例子，我们创建一个缓存来存储 PHP 变量。缓存类必须把变量写进一个文件，以便以后可以重新加载或重用。它还应该允许你为缓存数据指定一个标识符以及存储的方式。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">数据缓存</p>
+
+<p class="docNoteText">缓存用于保存一个资源，以便以后可以重用。如果从原始的资源创建资源比从缓存中读取要昂贵得多，那么你就可以创建一个缓存，并重用它。从数据库执行聚合查询，解析一个大型的 XML 文件或配置文件，就属于这类例子。
+
+</p><p class="docNoteText">缓存也不是没有问题：缓存可能造成与数据源的不同步(失效)，而且缓存需要占用额外的内存</p>
+
+</div>
+
+<p class="docText">我们先开发一个不使用 Strategy 模式的缓存实现。</p>
+
+<p class="docText">因为你可能想要缓存不只一个值，所以你需要一个标识符以确定哪一个缓存了你感兴趣的内容。在这个例子中，标识符就是‘<tt>application_config</tt>’。下面就是一个如何使用缓存的例子：</p>
+
+<pre>
+// PHP4
+$config_cache =&amp; new VarCache('application_config');
+if ($config_cache-&gt;isValid()) {
+  $config = $config_cache-&gt;get();
+} else {
+  $config = slow_expensive_function_to_get_config();
+  $config_cache-&gt;set($config);
+}
+</pre>
+
+<p class="docText">这段代码创建了一个新的 <tt>VarCache</tt> 对象，并把它保存在 <tt>$config_cache</tt> 变量中。缓存中的数据与‘<tt>application_config</tt>’标识符关联在一起。如果缓存包含一个值，<tt>isValid()</tt> 就会返回 <tt>true</tt>，而且缓存的值也会被返回；否则，值就会被重新计算并存入缓存供以后使用。</p>
+
+<p class="docText">像往常一样，我们通过编写一个测试用例来开始编码。首先，空缓存应该总是返回 <tt>false</tt> 来响应 <tt>isValid()</tt> 方法。</p>
+
+<pre>
+class VarCacheTestCase extends UnitTestCase {
+  function TestUnsetValueIsInvalid() {
+    $cache =&amp; new VarCache('foo');
+    $this-&gt;assertFalse($cache-&gt;isValid());
+  }
+}
+</pre>
+
+<p class="docText">因为至今还没有 <tt>VarCache</tt> 的代码，所以最简单的实现是插入一个占位方法。</p>
+
+<pre>
+class VarCache {
+  function isValid() {}
+}
+</pre>
+
+<p class="docText">测试通过，因此可以继续增加测试用例了。</p>
+
+<pre>
+class VarCacheTestCase extends UnitTestCase {
+  function TestUnsetValueIsInvalid() { /* ... */ }
+
+  function TestIsValidTrueAfterSet() {
+    $cache =&amp; new VarCache('foo');
+    $cache-&gt;set('bar');
+
+    $this-&gt;assertTrue($cache-&gt;isValid());
+  }
+}
+</pre>
+
+<p class="docText">以上测试验证当缓存非空时是有效的。</p>
+
+<p class="docText">是时候开始认真编写缓存类了。<tt>VarCache</tt> 被传递了一个标识符，因此，构造函数必须记录那个标识符。另外，它还有一个 <tt>set()</tt> 方法，用于把一个值存储在缓存中，而且会改变 <tt>isValid()</tt> 的返回值。</p>
+
+<pre>
+class VarCache {
+  <span class="docEmphStrong">var $_name;</span>
+
+  <span class="docEmphStrong">function VarCache($name) {
+    $this-&gt;_name = 'cache/'.$name;
+  }</span>
+
+  function isValid() {
+    <span class="docEmphStrong">return file_exists($this-&gt;_name.'.php');</span>
+  }
+
+  <span class="docEmphStrong">function set() {
+    $file_handle = fopen($this-&gt;_name.'.php', 'w');
+    fclose($file_handle);
+  }</span>
+}
+</pre>
+
+<p class="docText">实例变量 <tt>$_name</tt> 存储数据缓存的标识符。在这个简单的实现中，<tt>$_name</tt> 被用作一个文件名的组成部分(在一个真实的应用程序中，或许会被一个数据库或其它存储器代替)。<tt>set()</tt> 使用 <tt>fopen()</tt> 和 <tt>fclose()</tt> 基于 <tt>$_name</tt>“联系”一个文件。调用 <tt>set()</tt> 之后，<tt>VarCache::isValid</tt> 中的 <tt>file_exists()</tt> 调用返回 <tt>true</tt>。</p>
+
+<p class="docText">运行这个测试通过，但再次运行却失败了！为什么？因为第一次运行这个测试之后留下了一个文件，因此干扰了测试的第二次运行，这是非常令人不快的情况。理想的情况下，每个测试用例应该是独立的。</p>
+
+<p class="docText">幸运的是，通常，单元测试框架，SimpleTest 明确地，提供在一个测试运行前准备一个环境并在结束后恢复到一个已知状态的功能。<tt>UnitTestCase::setUp()</tt> 执行前者；<tt>UnitTestCase::tearDown()</tt> 执行后者。</p>
+
+<p class="docText">把以下代码加入测试用例，就可以确保每个测试方法都有一个全新的开始：</p>
+
+<pre>
+class VarCacheTestCase extends UnitTestCase {
+  function setup() {
+    @unlink('cache/foo.php');
+  }
+  // ...
+}
+</pre>
+
+<p class="docText">现在，在每个测试方法执行前，缓存文件都会被删除，确保隔离每个测试方法。(在一个更加真实的测试驱动开发的应用中，你或许会编写一个 <tt>VarCache::clear()</tt> 方法来处理缓存变量的删除工作。)</p>
+
+<p class="docText">既然干扰因素已经被消除，测试又可以运行了，意味着你已经准备好继续进行测试和编码了。</p>
+
+<pre>
+class VarCacheTestCase extends UnitTestCase {
+  function setup() { /* ... */ }
+  function TestUnsetValueIsInvalid() { /* ... */ }
+  function TestIsValidTrueAfterSet() { /* ... */ }
+
+  function TestCacheRetainsValue() {
+    $test_val = 'test'.rand(1, 100);
+    $cache =&amp; new VarCache('foo');
+    $cache-&gt;set($test_val);
+    $this-&gt;assertEqual($test_val, $cache-&gt;get());
+  }
+}
+</pre>
+
+<p class="docText">以上测试验证 <tt>VarCache::get()</tt> 返回的值与传递给 <tt>VarCache::set()</tt> 的值相同。</p>
+
+<pre>
+class VarCache {
+  var $_name;
+
+  function VarCache($name) { /* ... */ }
+  function isValid() { /* ... */ }
+<span class="docEmphStrong">
+  function get() {
+    if ($this-&gt;isValid()) {
+      return file_get_contents($this-&gt;_name.'.php');
+    }
+  }</span>
+
+  function set($value) {
+    $file_handle = fopen($this-&gt;_name.'.php', 'w');
+    <span class="docEmphStrong">fwrite($file_handle, $value);</span>
+    fclose($file_handle);
+  }
+}
+</pre>
+
+<p class="docText">使用以粗体突出显示的附加代码，<tt>VarCache::set()</tt> 把 <tt>$value</tt> 参数的内容写进文件，而 <tt>VarCache::get()</tt> 用 <tt>file_get_content()</tt> 返回那个值。</p>
+
+<p class="docText">迄今为止的实现对字符串和数字工作得很好，但不能用于像数组和对象这样更加复杂的变量。以一个测试用例表示：</p>
+
+<pre>
+class VarCacheTestCase extends UnitTestCase {
+  // ...
+
+  function TestStringFailsForArray() {
+    <span class="docEmphStrong">$test_val = array('one', 'two');</span>
+    $cache =&amp; new VarCache('foo');
+    $cache-&gt;set($test_val);
+
+    <span class="docEmphStrong">$this-&gt;assertError('Array to string conversion');</span>
+    $this-&gt;assertNotEqual($test_val, $cache-&gt;get());
+    $this-&gt;assertEqual('array', strtolower($cache-&gt;get()));
+  }
+}
+</pre>
+
+<p class="docText">简单起见，我们跳到这个实现的终点，它随后将作为 Strategy 重构的起点。</p>
+
+<p class="docText">下面就是完成这个 <tt>VarCache</tt> 变种的一系列附加代码。</p>
+
+<pre>
+class VarCache {
+  //...
+
+  function get() {
+    if ($this-&gt;isValid()) {
+      <span class="docEmphStrong">include $this-&gt;_name.'.php';
+      return $cached_content;</span>
+    }
+  }
+  //...
+}
+</pre>
+
+<p class="docText">这里的关键改变是 <tt>get()</tt> 方法(因为它包含了缓存文件，因此被期望是有效的 PHP 文件)。此外，这个方法返回 <tt>$cached_content</tt> 变量，所以 <tt>set()</tt> 方法无论做什么，它必须设置这个变量！</p>
+
+<p class="docText">那么，对于一个数字值又会是什么样子的呢？</p>
+
+<pre>
+class VarCache {
+  //...
+
+  function set($value) {
+    <span class="docEmphStrong">$file_handle = fopen($this-&gt;_name.'.php', 'w');
+    $template = '&lt;?php $cached_content = %s;';
+    $content = sprintf($template, (float)$value);</span>
+    fwrite($file_handle, $content);
+    fclose($file_handle);
+  }
+}
+</pre>
+
+<p class="docText">这段代码对于数字工作得很好，但对于字符串呢？对于字符串，PHP 缓存文件模板必须以 <tt>= '%s';</tt> 结束，而不是 <tt>= %s;</tt>。这正是引入“<tt>type</tt>”参数的理由：它将指定一个数字或字符串(或其它类型)。而且预料还会增加更多的类型，我们在 <tt>set()</tt> 方法中添加一个选择语句和一个 <tt>_getTemplate()</tt> 方法来使增加新的类型更加容易。</p>
+
+<pre>
+class VarCache {
+  var $_name;
+  var $_type;
+
+  function VarCache($name, $type = 'string') {
+    $this-&gt;_name = 'cache/'.$name;
+    <span class="docEmphStrong">$this-&gt;_type = $type;</span>
+  }
+  // ...
+
+  function _getTemplate() {
+    $template = '&lt;?php $cached_content = ';
+
+    switch ($this-&gt;_type) {
+      <span class="docEmphStrong">case 'string':
+        $template .= &quot;'%s';&quot;;
+        break;</span>
+      case 'numeric':
+        $template .= '%s;';
+        break;
+      default:
+        trigger_error('invalid cache type');
+    }
+
+    return $template;
+  }
+
+  function set($value) {
+    $file_handle = fopen($this-&gt;_name.'.php', 'w');
+
+    switch ($this-&gt;_type) {
+      <span class="docEmphStrong">case 'string':
+        $content = sprintf($this-&gt;_getTemplate(),
+        str_replace(&quot;'&quot;, &quot;\\'&quot;, $value));
+        break;</span>
+      case 'numeric':
+        $content = sprintf($this-&gt;_getTemplate(), (float)$value);
+        break;
+      default:
+        trigger_error('invalid cache type');
+    }
+
+    fwrite($file_handle, $content);
+    fclose($file_handle);
+  }
+}
+</pre>
+
+<p class="docText">现在，构造函数增加了第二个可选的参数，用来指示第一个参数是‘<tt>numeric</tt>’还是‘<tt>string</tt>’。这个类的最终版本，如下所示，还包括一个存储复杂的像数组或对象那样的类型的‘<tt>serialize</tt>’存储类型。</p>
+
+<pre>
+class VarCache {
+  var $_name;
+  var $_type;
+
+  function VarCache($name, $type = 'serialize') {
+    $this-&gt;_name = 'cache/'.$name;
+    $this-&gt;_type = $type;
+  }
+
+  function isValid() {
+    return file_exists($this-&gt;_name.'.php');
+  }
+
+  function get() {
+    if ($this-&gt;isValid()) {
+      include $this-&gt;_name.'.php';
+      return $cached_content;
+    }
+  }
+
+  function _getTemplate() {
+    $template = '&lt;?php $cached_content = ';
+
+    switch ($this-&gt;_type) {
+      case 'string':
+        $template .= &quot;'%s';&quot;;
+        break;
+      <span class="docEmphStrong">case 'serialize':
+        $template .= &quot;unserialize(stripslashes('%s'));&quot;;
+        break;</span>
+      case 'numeric':
+        $template .= '%s;';
+        break;
+      default:
+        trigger_error('invalid cache type');
+    }
+
+    return $template;
+  }
+
+  function set($value) {
+    $file_handle = fopen($this-&gt;_name.'.php', 'w');
+
+    switch ($this-&gt;_type) {
+      case 'string':
+        $content = sprintf($this-&gt;_getTemplate(),
+        str_replace(&quot;'&quot;, &quot;\\'&quot;, $value));
+        break;
+      <span class="docEmphStrong">case 'serialize':
+        $content = sprintf($this-&gt;_getTemplate(), addslashes(serialize($value)));
+        break;</span>
+      case 'numeric':
+        $content = sprintf($this-&gt;_getTemplate(), (float)$value);
+        break;
+      default:
+        trigger_error('invalid cache type');
+    }
+
+    fwrite($file_handle, $content);
+    fclose($file_handle);
+  }
+}
+</pre>
+
+<p class="docText">注意 <tt>_getTemplate()</tt> 和 <tt>set()</tt> 方法中的选择语句，这两个“<tt>switch</tt>”都是基于 <tt>$_type</tt> 实例变量的。<tt>get()</tt> 方法的运行方式并不会基于 <tt>$_type</tt> 改变，因此，似乎可变性只是被单独地限制在信息如何被存储上。另外，多重选择语句也是一个提示，它意味着适合用 Strategy 模式进行重构。</p>
+
+
+<h3 class="docSection1Title">范例代码</h3>
+
+<p class="docText">从多重 <tt>switch</tt> 语句到 Strategy 模式的变换是进行代码重构的一个经典的示例。测试用例没有变化；只是 <tt>VarCache</tt> 类的内部改变了。</p>
+
+<p class="docText">重构的第一步是分离你想封装在一个单独的类中的变化。从前面的例子我们知道，有三个“<tt>type</tt>”变体：‘<tt>string</tt>’、‘<tt>numeric</tt>’和‘<tt>serialize</tt>’。然后前面的例子还在对象被创建时选择了输出形式。有了“算法”，需要创建一个 API 来封装它。</p>
+
+<p class="docText">从以下代码开始：</p>
+
+<pre>
+class CacheWriter {
+  function store($file_handle, $var) {
+    die('abstract class-implement in concrete CacheWriter');
+  }
+}
+</pre>
+
+<p class="docText">这是一个 PHP 4 版本的接口。(你可以从这个类继承，以保证你正确地编写了子类，不过这样做会增加处理开销，特别是如果你把抽象 <tt>CacheWriter</tt> 类的定义放在与具体 <tt>CacheWriter</tt> 子类不同的文件中时。)</p>
+
+<p class="docText">抽象 <tt>CacheWriter</tt> 调用 <tt>store()</tt> 方法，这个方法需要一个文件句柄和需要存储的变量。每个具体的类必须实现 <tt>store()</tt>，使用任何一种来算法输出文件内容。当作为一个 PHP 脚本被包含时，就用传递给 <tt>store()</tt> 的变量生成 <tt>$cached_content</tt> 变量。于是，每种算法都实现为一个独立的子类。</p>
+
+<p class="docText">回想一下你将会替换的代码：</p>
+
+<pre>
+class VarCache {
+  // ...
+
+  function _getTemplate() {
+    <span class="docEmphStrong">$template = '&lt;?php $cached_content = ';</span>
+
+    switch ($this-&gt;_type) {
+      case 'string':
+        <span class="docEmphStrong">$template .= &quot;'%s';&quot;;</span>
+        break;
+      // ...
+    }
+    // ...
+  }
+
+  function set($value) {
+    $file_handle = fopen($this-&gt;_name.'.php', 'w');
+
+    switch ($this-&gt;_type) {
+      case 'string':
+        <span class="docEmphStrong">$content = sprintf($this-&gt;_getTemplate(), str_replace(&quot;'&quot;, &quot;\\'&quot;, $value));</span>
+        break;
+      // ...
+    }
+
+    fwrite($file_handle, $content);
+    fclose($file_handle);
+  }
+}
+</pre>
+
+<p class="docText">对于每种缓存“类型”，需要把 <tt>_getTemplate()</tt> 和 <tt>set()</tt> 方法的相关部分抽取到各自的类中。以下是 <tt>StringCacheWriter</tt>：</p>
+
+<pre>
+class StringCacheWriter /* implements CacheWriter */ {
+  function store($file_handle, $string) {
+    $content = sprintf(&quot;&lt;?php\n\$cached_content = '%s';&quot;,
+                    str_replace(&quot;'&quot;, &quot;\\'&quot;, $string));
+    fwrite($file_handle, $contents);
+  }
+}
+</pre>
+
+<p class="docText">(因为 PHP4 并不支持接口概念，这里只是用注释来简单说明了一下。)</p>
+
+<p class="docText">下面是其它的算法 —— 存储“策略”。</p>
+
+<pre>
+class NumericCacheWriter /* implements CacheWriter */ {
+  function store($file_handle, $numeric) {
+    $content = sprintf(&quot;&lt;?php\n\$cached_content = %s;&quot;,
+                    (double)$numeric);
+    fwrite($file_handle, $content);
+  }
+}
+
+class SerializingCacheWriter /* implements CacheWriter */ {
+  function store($file_handle, $var) {
+    $content = sprintf(&quot;&lt;?php\n\$cached_content = unserialize(stripslashes('%s'));&quot;,
+                    addslashes(serialize($var)));
+    fwrite($file_handle, $content);
+  }
+}
+</pre>
+
+<p class="docText">通过把算法封装为可相互替换的类(相同的 API，多态性)，现在可以回到 <tt>VarCache</tt> 类，用 Strategy 模式来重新实现。对于重构后的版本，相同的测试用例应该可以继续运行。</p>
+
+<pre>
+class VarCache {
+  var $_name;
+  var $_type;
+
+  function VarCache($name, $type = 'serialize') {
+    $this-&gt;_name = 'cache/'.$name;
+
+    <span class="docEmphStrong">switch (strtolower($type)) {
+      case 'string': $strategy = 'String'; break;
+      case 'numeric': $strategy = 'Numeric'; break;
+      case 'serialize':
+      default: $strategy = 'Serializing';
+    }</span>
+
+    <span class="docEmphStrong">$strategy .= 'CacheWriter';
+    $this-&gt;_type =&amp; new $strategy;</span>
+  }
+
+  function isValid() {
+    return file_exists($this-&gt;_name.'.php');
+  }
+
+  function get() {
+    if ($this-&gt;isValid()) {
+      include $this-&gt;_name.'.php';
+      return $cached_content;
+    }
+  }
+
+  function set($value) {
+    $file_handle = fopen($this-&gt;_name.'.php', 'w');
+    <span class="docEmphStrong">$this-&gt;_type-&gt;store($file_handle, $value);</span>
+    fclose($file_handle);
+  }
+}
+</pre>
+
+<p class="docText">通过创建 <tt>CacheWriter</tt> 类的一个具体实例，并把它绑定到 <tt>$_type</tt> 实例变量，你可以使用 <tt>$this-&gt;_type-&gt;store($file_handle, $value)</tt> 来写所有的缓存文件，不需要关心最初选择的是哪种算法。</p>
+
+<p class="docText">这个例子说明了 Strategy 模式所定义的几个特性：一系列算法，每个都封装成一个单独的类，但绑定到一个容器对象。容器对象只以完全相同的方式使用公共的 API，而与特定的具体策略的选择无关。</p>
+
+
+<h3 class="docSection1Title">小结</h3>
+
+<p class="docText">Strategy 设计模式非常强大。尽管本书到目前为止介绍的其它模式为应用程序提供了基本构件，但 Strategy 是第一个能够在应用程序设计和项目改造中扮演一个真正的关键性角色的模式。</p>
+
+<p class="docText">取出对象的“内脏”，从而改变整个对象的行为和性能，这是非常强大的。而且，一个特定的策略只要绑定到对象一次然后就可以忘掉了，这使得 API 的其它部分变得更容易实现。最后，哪种算法正在使用中对你的其它代码是完全透明的。</p>
+
+<p class="docText">在 Internet 上有一段无法考证的引用说“<span class="docEmphasis">最后，一切都开始看起来像 Strategy 模式了。</span>”为什么？因为这个模式体现了多态性 —— OOP 最强大的方面之一 —— 的核心思想。</p>
+
+
+<h4 class="docSection2Title">相关模式</h4>
+
+<p class="docText">Strategy 模式与其它几种模式相似。Strategy 模式和 State 模式的主要区别是，Strategy 只绑定一次，而 State 模式的行为则随着实例变量值(对象的状态)的改变而改变。或则，换一种说法，Strategy 模式在构造期间改变对象的行为；State 在对象整个生命周期动态改变对象行为。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">设计模式 —— 状态(State)</p>
+
+<p class="docNoteText">State 模式允许对象在它的内部状态改变时修改它的行为。就好像对象能够有效地改变其类定义。</p>
+
+</div>
+
+<p class="docText">装饰(Decorator)模式(见第 12 章)的概念与 Strategy 模式相反。借用 GoF 的比喻，Strategy 改变的是对象的“内脏”，而 Decorator 模式改变的是对象的“外表”。</p>
+
+<p class="docText">最后一个相关模式是 Visitor。在 Strategy 模式中，你创建一个选择策略的具体实例并把它绑定到一个实例变量；在 Visitor 模式中，Strategy 是被当作一个参数来传递的。于是，可以把 Visitor 模式看作是 Strategy 模式的依赖倒置。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

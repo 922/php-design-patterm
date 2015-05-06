@@ -1,0 +1,750 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第十四章 The Active Recorde Pattern —— Active Recorde 模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第十四章 The Active Recorde Pattern —— Active Recorde 模式</h2>
+
+<p class="docText">迄今为止见到的设计模式大大地增强了脚本内部的可读性和可维护性；然而，它们没有一个涉及到了架构和开发 web 应用程序的一个基本的需求：数据库通信。本章和接下来的两章 —— Table Data Gateway 和 Data Mapper —— 提供了三种设计模式，用于更好地组织应用程序与数据库的交互。</p>
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">大多数 web 应用程序都把信息保存在数据库中。那么，有没有一种可以抽象数据库连接，从而简化对表的访问，并使持续化与业务逻辑集成的方法呢？</p>
+
+
+<h3 class="docSection1Title">解决方案</h3>
+
+<p class="docText">从概念上讲，Active Record 是最简单的与数据库相关的设计模式。Active Record 模式包含了如何直接与数据库交互的知识。</p>
+
+<p class="docText">尽管 Active Record 导致了程序代码与数据库结构之间的高度耦合，但是在相对简单的情况下，耦合带来的问题可能比采用一个复杂的解决方法更容易处理得多。对很多初级数据库项目而言，Active Record 也已经足够了，只有当复杂得不能用 Active Record 模式轻易地解决时，才有必要重构为 Table Data Gateway(见第 5 章)，Data Mapper(见第 6 章)，或其它数据库设计模式。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">企业应用程序设计模式</p>
+
+<p class="docNoteText">依照 Martin Fowler 的《企业应用程序设计模式》(<span class="docEmphasis">Patterns of Enterprise Application Architecture</span>)一书所说，所谓企业应用程序就是集成了其它应用程序，包含重要的业务逻辑(或也可能缺少逻辑部分，如应用需求经常显示的那样)，并且包含大量的，通过各种接口并发访问的持续性数据。有趣的是，web 应用程序正好具备了上述多个特征，这也可以解释为什么 Fowler 的书能引起 PHP 程序员的强烈共鸣。</div>
+
+<div class="docNote">
+
+<p class="docNoteTitle">PHP Data Objects(PHP 数据对象)</p>
+
+<p class="docNoteText">PDO 是一个值得特别关注的项目。PDO 是一个高性能数据库访问(并非数据库抽象) PHP 扩展模块。PDO 是一个本地驱动器的 C 语言包，因此非常的快。PDO 为所有的 PDO 驱动器都提供了预备语句功能，并且加强了使用这个库的脚本的安全性。</p>
+
+</div>
+
+
+<h3 class="docSection1Title">范例代码</h3>
+
+<p class="docText">任何关于数据库连接的讨论都与数据库和访问层的选择有关。本章和接下来的两章使用 MySQL(<a class="docLink" target="_blank" href="http://www.mysql.com/">http://www.mysql.com/</a>) 这个流行的开源数据库和 ADOdb(<a class="docLink" target="_blank" href="http://adodb.sf.net/">http://adodb.sf.net/</a>) 访问层。我把 <tt>ADOdb</tt> 作为我的工作室的一个标准，因为它具有优秀的性能，并且以统一的易于使用的 PHP API 对 Oracle OCI、PostgreSQL、Sybase、MySQL 和其它数据库进行了抽象，从而允许你把精力集中在程序设计和业务逻辑上。</p>
+
+<p class="docText">你可以放心地替换为自己的数据库和访问层，因为这里介绍的大多数概念很容易移植到其它解决方案中。</p>
+
+<p class="docText">在学习 Active Record 模式之前，我们从基本的数据库连接开始。在一个集中的地方，用一个简单的方法来指定连接参数(hostname、username、 password 和 database)并创建数据库连接对象是一个理想的选择。Singleton(见第 4 章) 就正好满足需要。</p>
+
+<p class="docText">下面是一个 <tt>DB</tt> 类，包含一个 <tt>conn()</tt> 方法，返回 <tt>ADOConnection</tt> 类的 Singleton 实例。</p>
+
+<pre>
+// PHP5
+require_once 'adodb/adodb.inc.php';
+
+class DB {
+  //static class, we do not need a constructor
+  private function __construct() {}
+
+  public static function conn() {
+    static $conn;
+
+    if (!$conn) {
+      $conn = adoNewConnection('mysql');
+      $conn-&gt;connect('localhost', 'username', 'passwd', 'database');
+      $conn-&gt;setFetchMode(ADODB_FETCH_ASSOC);
+    }
+
+    return $conn;
+  }
+}
+</pre>
+
+<p class="docText"><tt>DB</tt> 类允许你控制数据库类型和连接参数。第一行代码包含了 <tt>ADOdb</tt> 库(你可能需要修改包含路径以适应你的系统)；<tt>DB</tt> 的构造函数定义成 <tt>private</tt> 的，因为永远不需要直接创建一个 <tt>DB</tt> 的实例；<tt>$conn-&gt;setFetchMode(ADODB_FETCH_ASSOC)</tt> 这一行通知结果集对象以 <tt>field_name =&gt; value</tt> 联合数组形式返回记录行。在与数据库打交道时，使用联合数组是一个非常重要的好习惯，这样，你的代码才不会受 SQL 语句的 <tt>SELET</tt> 子句中字段的顺序所影响。</p>
+
+<p class="docText">举一个例程，我们创建一个 Active Record 对象来维护一个超连接表。下面就是在 MySQL 数据库中创建这个超链接表的 SQL 语句：</p>
+
+<pre>
+define('BOOKMARK_TABLE_DDL', &lt;&lt;&lt;EOS
+  CREATE TABLE `bookmark` (
+    `id` INT NOT NULL AUTO_INCREMENT ,
+    `url` VARCHAR( 255 ) NOT NULL ,
+    `name` VARCHAR( 255 ) NOT NULL ,
+    `description` MEDIUMTEXT,
+    `tag` VARCHAR( 50 ) ,
+    `created` DATETIME NOT NULL ,
+    `updated` DATETIME NOT NULL ,
+    PRIMARY KEY ( `id` )
+  )
+EOS
+);
+</pre>
+
+
+<h4 class="docSection2Title">测试独立性</h4>
+
+<p class="docText">测试应该彼此独立；否则，某个测试的运行将会干扰之后测试的结果。</p>
+
+<p class="docText">为了避免依赖同一个数据库的测试相互影响，最好每个测试方法之间都删除并重新建立数据库(或具体的表)。SimpleTest 提供了标准的 <tt>xUnit</tt> <tt>setup()</tt> 方法来为每次测试作准备。</p>
+
+<p class="docText">下面就是如何在每个测试之间“重置”你的数据库：</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  protected $conn;
+
+  function __construct($name = '') {
+    $this-&gt;UnitTestCase($name);
+    $this-&gt;conn = DB::conn();
+  }
+
+  function setup() {
+    <span class="docEmphStrong">$this-&gt;conn-&gt;execute('drop table bookmark');
+    $this-&gt;conn-&gt;execute(BOOKMARK_TABLE_DDL);</span>
+  }
+}
+</pre>
+
+<p class="docText">这段代码用一个标准的 <tt>ADOConection</tt> 对象来给 <tt>$conn</tt> 属性赋值，然后使用连接的 <tt>execute()</tt> 方法执行 SQL 语句，删除并重建数据表。因为这是在 <tt>setup()</tt> 方法中，因此每个测试方法都可以以一个全新的数据表拷贝开始。</p>
+
+<p class="docText">你还可以进一步对 <tt>setup()</tt> 方法做一些基本的检查(顺便学习一下 <tt>ADOConnection</tt> API)：</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  // ...
+
+  function testSetupLeavesTableEmptyWithCorrectStructure() {
+    $rs = $this-&gt;conn-&gt;execute('select * from bookmark');
+    $this-&gt;assertIsA($rs, 'ADORecordSet');
+    $this-&gt;assertEqual(0, $rs-&gt;recordCount());
+
+    foreach (array('id',
+                   'url',
+                   'name',
+                   'description',
+                   'tag',
+                   'created',
+                   'updated') as $i =&gt; $name) {
+      $this-&gt;assertEqual($name, $rs-&gt;fetchField($i)-&gt;name);
+    }
+  }
+}
+</pre>
+
+<p class="docText">即使你对 <tt>ADOdb</tt> 并不熟悉，你仍然可以大概明白，如果成功的话，<tt>execute()</tt> 方法返回一个 <tt>ADORecordSet</tt> 对象。这个对象有一个 <tt>recordCount()</tt> 方法，这里用来验证表是空的。结果集对象还有一些方法可以用来得到结果集元数据，这里就用了 <tt>fetchField()</tt> 来验证数据表的结构。</p>
+
+
+<h4 class="docSection2Title">创建记录</h4>
+
+<p class="docText">连接到数据库后，你的“创建、读取、更新、删除”(Create、Read、Update、Delete，CRUD)程序还必须能够在数据库中建立记录行。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">CRUD</p>
+
+<p class="docNoteText">缩写 CRUD 代表 Create、Read、Update 和 Delete(创建、读取、更新和删除)。这些都是所有与数据库交互的程序的基本功能。大多数 PHP web 应用程序都是 CrudScreen 程序(<a class="docLink" target="_blank" href="http://c2.com/cgi/wiki?CrudScreen">http://c2.com/cgi/wiki?CrudScreen</a>)。</p>
+
+</div>
+
+<p class="docText">下面的例程用来把书签保存到一个数据库中，所以，我们把 Active Record 类命名为 <tt>Bookmark</tt>。为了创建一个新的书签，可以使用 <tt>new</tt> 创建一个 <tt>Bookmark</tt>，并设置实例的属性。当所有的属性都设置好后(强制性的)，就可以用 <tt>save()</tt> 方法把书签存入数据库了。</p>
+
+<p class="docText">下面的测试说明了这个意图：</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  // ...
+
+  function testNew() {
+    $link = new Bookmark;
+    $link-&gt;url = 'http://simpletest.org/';
+    $link-&gt;name = 'SimpleTest';
+    $link-&gt;description = 'SimpleTest project homepage';
+    $link-&gt;tag = 'testing';
+
+    $link-&gt;save();
+
+    $this-&gt;assertEqual(1, $link-&gt;getId());
+  }
+}
+</pre>
+
+<p class="docText">根据这个测试，<tt>Bookmark</tt> 类应该包含一些 <tt>public</tt> 属性和一个 <tt>save()</tt> 方法。在实例被存入数据库后，<tt>getId()</tt> 应该返回分配给这个 B<tt>ookmark</tt> 的数据行 <tt>ID</tt>。</p>
+
+<p class="docText">下面就是 <tt>Bookmark</tt> 类的属性：</p>
+
+<pre>
+class Bookmark {
+  public $url;
+  public $name;
+  public $description;
+  public $tag;
+}
+</pre>
+
+<p class="docText">我们再来看 <tt>save()</tt> 方法。它需要一个数据库连接，所以我们在构造函数中使用了 <tt>DB::conn()</tt> 连接工厂：</p>
+
+<pre>
+class Bookmark {
+  protected $id;
+  protected $conn;
+  // ...
+
+  public function __construct() {
+    $this-&gt;conn = DB::conn();
+  }
+}
+</pre>
+
+<p class="docText"><tt>$conn</tt> 现在是一个适合 <tt>save()</tt> 使用的数据库连接了。</p>
+
+<pre>
+class Bookmark {
+  // ...
+
+  <span class="docEmphStrong">const INSERT_SQL =&quot;insert into bookmark (url, name,
+    description, tag, created, updated)
+    values (?, ?, ?, ?, now(), now())&quot;;</span>
+
+  <span class="docEmphStrong">protected function save() {
+    $rs = $this-&gt;conn-&gt;execute(self::INSERT_SQL,
+                               array($this-&gt;url,
+                                     $this-&gt;name,
+                                     $this-&gt;description,
+                                     $this-&gt;tag));
+    if ($rs) {
+      $this-&gt;id = (int)$this-&gt;conn-&gt;Insert_ID();
+    } else {
+      trigger_error('DB Error: '.$this-&gt;conn-&gt;errorMsg());
+    }
+  }</span>
+}
+</pre>
+
+<p class="docText"><tt>ADOdb</tt> 的 MySQL 驱动器支持按位置的参数替换功能，而且还可以为参数适当地添加引号。查询中包含的 SQL 参数用问号 (<tt>?</tt>) 表示，然后，你可以把一个替代值数组当作第二个参数传递给 <tt>execute()</tt> 方法。</p>
+
+<p class="docText"><tt>Insert_ID()</tt> 应该会引起你的注意：它返回上一次执行 <tt>INSERT</tt> 语句产生的 <tt>AUTO_INCREMENT</tt> 值。</p>
+
+<p class="docText">迄今为止的测试证明了属性能被设置，<tt>save()</tt> 能够正常工作，而且 <tt>$id</tt> 属性也已经被设置为 <tt>1</tt>。我们继续深入研究数据表，并验证书签的其它属性也恰当地设置了。</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  // ...
+
+  function testNew() {
+    $link = new Bookmark;
+    $link-&gt;url = 'http://simpletest.org/';
+    $link-&gt;name = 'SimpleTest';
+    $link-&gt;description = 'SimpleTest project homepage';
+    $link-&gt;tag = 'testing';
+
+    $link-&gt;save();
+
+    $this-&gt;assertEqual(1, $link-&gt;getId());
+
+    // fetch the table as an array of hashes
+    <span class="docEmphStrong">$rs = $this-&gt;conn-&gt;getAll('select * from bookmark');
+    $this-&gt;assertEqual(1, count($rs), 'returned 1 row');
+
+    foreach (array('url', 'name', 'description', 'tag') as $key) {
+      $this-&gt;assertEqual($link-&gt;$key, $rs[0][$key]);
+    }</span>
+  }
+}
+</pre>
+
+<p class="docText">突出显示的代码用于取得整个 <tt>bookmark</tt> 表。<tt>getAll()</tt> 方法执行传递的查询，然后以数据行数组的方式返回结果集。<tt>assertEqual()</tt> 验证结果集中只有一条记录。<tt>foreach</tt> 循环对 <tt>$link</tt> 对象的属性和返回记录行的字段进行比较。</p>
+
+<p class="docText">这段代码可以正常运行，但是像这样添加书签 —— 手工设置每个属性 —— 可能有些厌烦。因此，我们给测试用例添加一个适用的方法来帮助添加 <tt>bookmark</tt> 对象。</p>
+
+<p class="docText"><tt>ActiveRecordTestCase::add()</tt> 方法接受四个参数，创建并插入一个新的 Active Record Bookmark 对象。另外，<tt>add()</tt> 最好返回被创建的 <tt>Bookmark</tt> 对象，以防随后的测试会用到这个新对象。</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  // ...
+
+  function add($url, $name, $description, $tag) {
+    $link = new Bookmark;
+    $link-&gt;url = $url;
+    $link-&gt;name = $name;
+    $link-&gt;description = $description;
+    $link-&gt;tag = $tag;
+
+    $link-&gt;save();
+
+    return $link;
+  }
+}
+</pre>
+
+<p class="docText">你可以在测试用例中实际地编写一个测试方法来证明这个方法可以工作：</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  // ...
+
+  function testAdd() {
+    $this-&gt;add('http://php.net',
+               'PHP',
+               'PHP Language Homepage',
+               'php');
+    $this-&gt;add('http://phparch.com',
+               'php|architect',
+               'php|arch site',
+               'php');
+
+    $rs = $this-&gt;conn-&gt;execute('select * from bookmark');
+
+    $this-&gt;assertEqual(2, $rs-&gt;recordCount());
+    $this-&gt;assertEqual(2, $this-&gt;conn-&gt;Insert_ID());
+  }
+}
+</pre>
+
+<p class="docText">既然书签能够被创建和保存到数据库了，我们再为 Active Record <tt>Bookmark</tt> 对象增加一个方法，以便可以方便地从数据库中检索数据，并把检索到的值存储为实例属性。创建 Active Record 对象常用的技术是传递一个像书签 <tt>ID</tt> 那样的标识符(或某种设置条件)给它的构造函数，然后从数据库中加载与这个 <tt>ID</tt> 关联的记录行。下面这个测试就演示了这种技术：</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  // ...
+
+  function testCreateById() {
+    $link = $this-&gt;add('http://blog.casey-sweat.us/',
+                       'My Blog',
+                       'Where I write about stuff',
+                       'php');
+
+    $this-&gt;assertEqual(1, $link-&gt;getId());
+
+    $link2 = new Bookmark(1);
+
+    $this-&gt;assertIsA($link2, 'Bookmark');
+    $this-&gt;assertEqual($link, $link2);
+  }
+}
+</pre>
+
+<p class="docText">这个测试传递了一个 <tt>ID</tt> 给构造函数，这在已有的测试中没有出现过。传递 <tt>ID</tt> 必须是可选的，因为已有的创建新的空 <tt>Bookmark</tt> 实例的测试必须能够继续运行。</p>
+
+<p class="docText">下面就是实现测试需求的代码：</p>
+
+<pre>
+class Bookmark {
+  // ...
+
+  <span class="docEmphStrong">const SELECT_BY_ID = 'select * from bookmark where id = ?';</span>
+
+  <span class="docEmphStrong">public function __construct($id=false) {
+    $this-&gt;conn DB::conn();
+
+    if ($id) {
+      $rs = $this-&gt;conn-&gt;execute(self::SELECT_BY_ID, array((int)$id));
+      if ($rs) {
+        $row = $rs-&gt;fetchRow();
+        foreach ($row as $field =&gt; $value) {
+          $this-&gt;$field = $value;
+        }
+      } else {
+        trigger_error('DB Error: '.$this-&gt;conn-&gt;errorMsg());
+      }
+    }</span>
+  }
+
+  // ...
+}
+</pre>
+
+<p class="docText">这个构造函数允许接受一个 <tt>$id</tt> 参数，其默认值为 <tt>false</tt>。如果传入一个非 <tt>false</tt> 的 <tt>$id</tt> 参数，那么 <tt>Bookmark</tt> 会在 <tt>bookmark</tt> 表中查询相应 <tt>ID</tt> 的记录。如果存在这样一条记录，对象的所有属性就会被设置为数据库查询所返回的值。</p>
+
+
+<h5 class="docSection3Title">测试数据库失败</h5>
+
+<p class="docText">数据库通常都能正确地工作，但失败是不可避免的。在失败的条件下，为了确保代码能够正确操作，我们用一个代表连接对象的 Mock Object(见第 6 章 —— 模拟对象模式) 来模仿一个失败。</p>
+
+<pre>
+Mock::generate('ADOConnection');
+
+class ActiveRecordTestCase extends UnitTestCase {
+  //...
+
+  function testDbFailure() {
+    $conn = new MockADOConnection($this);
+    $conn-&gt;expectOnce('execute', array('*', '*'));
+    $conn-&gt;setReturnValue('execute', false);
+    $conn-&gt;expectOnce('errorMsg');
+    $conn-&gt;setReturnValue('errorMsg',
+                          'The database has exploded!!!!');
+  }
+}
+</pre>
+
+<p class="docText">这段代码调用 <tt>Mock::generate()</tt> 创建一个 <tt>MockADOConnection</tt> 类，创建模拟连接的一个实例，设置一些基本的代表失败的返回值，而且定义了在这些情况下会调用的预期的操作。</p>
+
+<p class="docText">可是，因为 <tt>Bookmark</tt> 的构造函数调用静态 <tt>DB:conn()</tt> 方法取得数据库连接，所以很难把模拟连接注入到代码中。有几种方法可以绕过这个问题：可以增加一个方法来改变 <tt>$this-&gt;conn</tt>，也可以为每个方法添加一个可选参数，或为构造函数增加一个参数。我们选择最后一种：为 <tt>Bookmark</tt> 构造函数增加一个可选的连接类参数：</p>
+
+<pre>
+class Bookmark {
+  // ...
+
+  public function __construct($id=false, $conn=false) {
+    $this-&gt;conn = ($conn) ? $conn : DB::conn();
+    // ...
+  }
+}
+</pre>
+
+<p class="docText">现在，<tt>new Bookmark</tt> 依然能够正常工作，但 <tt>new Bookmark(1, $connection)</tt> 则会使用 <tt>$connection </tt>对象代替正常的 <tt>ADOConnection</tt> 对象。</p>
+
+<p class="docText">用这样的代码，现在就可以方便地用 <tt>MockADOconnection</tt> 来代替“正常的”数据库连接对象，并验证“数据库失败”的情况。</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  // ...
+
+  function testDbFailure() {
+    $conn = new MockADOConnection($this);
+    $conn-&gt;expectOnce('execute', array('*', '*'));
+    $conn-&gt;setReturnValue('execute', false);
+    $conn-&gt;expectOnce('errorMsg');
+    $conn-&gt;setReturnValue('errorMsg',
+                          'The database has exploded!!!!');
+
+    <span class="docEmphStrong">$link = new Bookmark(1, $conn);
+    $this-&gt;assertErrorPattern('/exploded/i');</span>
+
+    <span class="docEmphStrong">$conn-&gt;tally();</span>
+  }
+}
+</pre>
+
+
+<h5 class="docSection3Title">Active Record 实例 ID</h5>
+
+<p class="docText">在前面的例子中，大多数属性都定义成 <tt>public</tt> 的；但是，<tt>bookmark</tt> 的 <tt>ID</tt> 是 <tt>protected</tt> 的，这样可以避免意外改变它的值(当以后需要修改 <tt>bookmark</tt> 的时候，这可能是一个问题)。因为 <tt>$id</tt> 被定义成 <tt>protected</tt>，所以需要增加一个 accessor 方法来从 <tt>Bookmark</tt> 得到它。</p>
+
+<pre>
+class Bookmark {
+  protected $id;
+  //...
+
+  public function getId() {
+    return $this-&gt;id;
+  }
+}
+</pre>
+
+<p class="docText">如何测试这个方法呢？</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  // ...
+
+  function testGetId() {
+    $this-&gt;add('http://php.net',
+               'PHP',
+               'PHP Language Homepage',
+               'php');
+
+    // second bookmark, id=2
+    $link = $this-&gt;add('http://phparch.com',
+                       'php|architect',
+                       'php|arch site',
+                       'php');
+
+    <span class="docEmphStrong">$this-&gt;assertEqual(2, $link-&gt;getId());</span>
+  }
+}
+</pre>
+
+<p class="docText">上面的 <tt>add()</tt> 直接保存了几个 <tt>bookmarks</tt>，并对最后的 <tt>bookmark</tt> 进行了验证。</p>
+
+<p class="docText">到目前为止，一切都还不错。但是，如果不使用书签 <tt>ID</tt>，而是基于一个不同的条件来验证数据库项目又会怎么样呢？如何保证从数据库返回正确的 <tt>ID</tt> 呢？一种不错的技术是使用一个已知属性，从数据库 <tt>SELECT</tt> 数据，然后验证返回的数据行 <tt>ID</tt>。下面就是一个使用这个方法的例子：</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  // ...
+
+  function testGetId() {
+    $this-&gt;add('http://php.net',
+               'PHP',
+               'PHP Language Homepage',
+               'php');
+
+    // second bookmark, id=2
+    $link = $this-&gt;add('http://phparch.com',
+                       'php|architect',
+                       'php|arch site',
+                       'php');
+
+    $this-&gt;assertEqual(2, $link-&gt;getId());
+
+    <span class="docEmphStrong">$alt_test = $this-&gt;conn-&gt;getOne(&quot;select id from bookmark
+      where url = 'http://phparch.com'&quot;);
+
+    $this-&gt;assertEqual(2, $alt_test);
+
+    //alternatively
+    $this-&gt;assertEqual($link-&gt;getId(), $alt_test);</span>
+  }
+}
+</pre>
+
+<p class="docText">注意，这个测试可能与你手工执行一条 SQL 来验证数据是否正确插入到了书签表的操作相似。但通过把这个操作编写为一个测试，而不仅仅是手工执行一次，在每次运行测试的时候，你都可以继续进行验证。</p>
+
+
+<h4 class="docSection2Title">查询记录</h4>
+
+<p class="docText">现在，<tt>Bookmark</tt> 可以被保存在数据库中，也可以通过检索与书签 <tt>ID</tt> 匹配的记录(重新)创建。但是，如果不知道 <tt>ID</tt>(通常就是这种情况)，或想查询一个相关值，比如部分名称或一个 <tt>URL</tt>，又会怎样。通常的解决方法是增加“查询”方法。</p>
+
+<p class="docText">例如，你可能需要一个 <tt>findByUrl()</tt> 方法来查找与传递给方法的参数相似的 <tt>Bookmarks</tt>。用一个测试来说明这个意图：</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  // ...
+
+  function testFindByUrl() {
+    $this-&gt;add('http://blog.casey-sweat.us/',
+               'My Blog',
+               'Where I write about stuff',
+               'php');
+    $this-&gt;add('http://php.net',
+               'PHP',
+               'PHP Language Homepage',
+               'php');
+    $this-&gt;add('http://phparch.com',
+               'php|architect',
+               'php|arch site',
+               'php');
+
+    $result = Bookmark::findByUrl('php');
+
+    $this-&gt;assertIsA($result, 'array');
+    $this-&gt;assertEqual(2, count($result));
+    $this-&gt;assertEqual(2, $result[0]-&gt;getId());
+    $this-&gt;assertEqual('php|architect', $result[1]-&gt;name);
+  }
+}
+</pre>
+
+<p class="docText">这个测试创建一些数据，查找 <tt>URL</tt> 中含有“<tt>php</tt>”的记录。然后验证返回的 <tt>Bookmark</tt> 对象数组的特征。<tt>FindByUrl()</tt> 是一个静态方法，因为你想要的是 <tt>Bookmark</tt> 对象，但那时还没有 <tt>Bookmark</tt> 类的实例可用。(此外，也可以把这些“查询”方法移到各自的对象，但现在它们是 Active Record <tt>Bookmark</tt> 类的一部分。)</p>
+
+<p class="docText">下面的代码实现了测试所表达的需求：</p>
+
+<pre>
+class Bookmark {
+  // ...
+
+  const SELECT_BY_URL =&quot;select id from bookmark where url like ?&quot;;
+
+  public static function findByUrl($url) {
+    $rs = DB::conn()-&gt;execute(self::SELECT_BY_URL, array(&quot;%$url%&quot;));
+
+    $ret = array();
+    if ($rs) {
+      foreach ($rs-&gt;getArray() as $row) {
+      $ret[] = new Bookmark($row['id']);
+    }
+
+    return $ret;
+  }
+}
+</pre>
+
+
+<h4 class="docSection2Title">更新记录</h4>
+
+<p class="docText">完成了 CRUD 的 Create 和 Read 部分；那么 Update 呢？用 <tt>save()</tt> 来更新一个 Active Record 对象似乎是合乎情理的，但是，<tt>save()</tt> 现在只会处理 <tt>INSERT</tt> 语句。回顾一下，<tt>save()</tt> 如下：</p>
+
+<pre>
+class Bookmark{
+  // ...
+
+  const INSERT_SQL =&quot;insert into bookmark (url, name,
+    description,tag, created, updated)
+    values (?, ?, ?, ?, now(), now())&quot;;
+
+  protected function save() {
+    $rs = $this-&gt;conn-&gt;execute(self::INSERT_SQL,
+                               array($this-&gt;url,
+                                     $this-&gt;name,
+                                     $this-&gt;description,
+                                     $this-&gt;tag));
+    if ($rs) {
+      $this-&gt;id = (int)$this-&gt;conn-&gt;Insert_ID();
+    } else {
+      trigger_error('DB Error: '.$this-&gt;conn-&gt;errorMsg());
+    }
+  }
+}
+</pre>
+
+<p class="docText">然而，在已经有了一个有效的实例后，你更愿意看到如下的代码：</p>
+
+<pre>
+class Bookmark {
+  // ...
+
+  const UPDATE_SQL =&quot;update bookmark set url = ?,
+                                         name = ?,
+                                         description = ?,
+                                         tag = ?,
+                                         updated = now() where id = ?&quot;;
+
+  public function save() {
+    $this-&gt;conn-&gt;execute(self::UPDATE_SQL,
+                         array($this-&gt;url,
+                               $this-&gt;name,
+                               $this-&gt;description,
+                               $this-&gt;tag,
+                               $this-&gt;id));
+  }
+}
+</pre>
+
+<p class="docText">为了区分 <tt>INSERT</tt> 和 <tt>UPDATE</tt>，需要检测一个书签是新建的还是从数据库加载的。</p>
+
+<p class="docText">首先，把两个“版本”的 <tt>save()</tt> 重构为单独的受保护的 <tt>insert()</tt> 和 <tt>update()</tt> 方法。</p>
+
+<pre>
+class Bookmark {
+  // ...
+
+  protected function insert() {
+    $rs = $this-&gt;conn-&gt;execute(self::INSERT_SQL,
+                               array($this-&gt;url,
+                                     $this-&gt;name,
+                                     $this-&gt;description,
+                                     $this-&gt;tag));
+    if ($rs) {
+      $this-&gt;id = (int)$this-&gt;conn-&gt;Insert_ID();
+    }
+  }
+
+  protected function update() {
+    $this-&gt;conn-&gt;execute(self::UPDATE_SQL,
+                         array($this-&gt;url,
+                               $this-&gt;name,
+                               $this-&gt;description,
+                               $this-&gt;tag,
+                               $this-&gt;id));
+  }
+}
+</pre>
+
+<p class="docText">现在，你可以修改 <tt>save()</tt> 来进行判断了：</p>
+
+<pre>
+class Bookmark {
+  <span class="docEmphStrong">const NEW_BOOKMARK = -1;</span>
+
+  <span class="docEmphStrong">protected $id = Bookmark::NEW_BOOKMARK;</span>
+  // ...
+
+  public function save() {
+    if ($this-&gt;id == Bookmark::NEW_BOOKMARK) {
+      $this-&gt;insert();
+    } else {
+      $this-&gt;update();
+    }
+  }
+}
+</pre>
+
+<p class="docText">还有最后一个问题：只要插入或修改一个记录，数据库中的时间戳就会改变。除了再次查询数据库，没有别的方法可以在 <tt>Bookmark</tt> 中保持一个正确的时间戳。这既要应用于插入操作也要应用于修改操作，因此，应该改变 Active Record 类，在 <tt>save()</tt> 方法结束前，总是修改时间戳，以防止修改后的对象会变得不同步。</p>
+
+<pre>
+class Bookmark {
+  // ...
+
+  public function save() {
+    if ($this-&gt;id == self::NEW_BOOKMARK) {
+      $this-&gt;insert();
+    } else {
+      $this-&gt;update();
+    }
+
+    $this-&gt;setTimeStamps();
+  }
+
+  protected function setTimeStamps() {
+    $rs = $this-&gt;conn-&gt;execute(self::SELECT_BY_ID,
+                               array($this-&gt;id));
+    if ($rs) {
+      $row = $rs-&gt;fetchRow();
+      $this-&gt;created = $row['created'];
+      $this-&gt;updated = $row['updated'];
+    }
+  }
+}
+</pre>
+
+<p class="docText"><tt>Bookmark</tt> 触到了 Active Record 模式的要害：<tt>save()</tt> 知道修改或插入数据表所需的 SQL 语句，知道对象的当前状态，而且可以从对象自己的属性组装所需的参数替换数组。我们来测试它：</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  // ...
+
+  function testSave() {
+    $link = Bookmark::add('http://blog.casey-sweat.us/',
+                          'My Blog',
+                          'Where I write about stuff',
+                          'php');
+    $link-&gt;description = 'Where I write about PHP, Linux and other stuff';
+
+    $link-&gt;save();
+
+    $link2 = Bookmark($link-&gt;getId());
+
+    $this-&gt;assertEqual($link-&gt;getId(), $link2-&gt;getId());
+    $this-&gt;assertEqual($link-&gt;created, $link2-&gt;updated);
+  }
+}
+</pre>
+
+<p class="docText">这里，我们暂时跳过 <tt>DELETE</tt> 的实现。在第 16 章 —— Data Mapper 模式会有一个例子，但你也很容易由 <tt>insert()</tt> 和 <tt>update()</tt> 方法演变而得到它。</p>
+
+
+<h3 class="docSection1Title">小结</h3>
+
+<p class="docText">Active Record 模式在概念和执行上都很简单，它或许代表了从过程编码到面向对象编程的最初的重构尝试。把所有的 SQL 代码集中到一个单独的地方是一个好主意，而且 Active Record 模式为结合业务逻辑和数据库访问来持续化对象提供了一个不错的方法。</p>
+
+<p class="docText">本章的例子用了一个实际的数据库来开发和测试代码。另一个测试简单数据库代码的方法是使用 Mock Objects(见第 6 章) 来完整地模拟数据库连接。可是不幸的是，这个方法不能够无限放大。SQL 是一种复杂的语言，模仿单独的语句使测试和数据库细节紧密耦合在一起。使用新建的，实际的表可以高度缓和这个问题，而且不会有模拟 SQL 的副作用。</p>
+
+<p class="docText">如果说 Active Record 模式有什么不足之处，那就是它的复杂性。Active Record 类可能疯狂地膨胀 —— 就像一块磁铁，吸引着添加更多的功能。例如，<tt>Bookmark</tt> 类仅包含一个 <tt>findById()</tt> 方法，但是你也可能需要 <tt>findByUrl()</tt>、<tt>findByDescription()</tt>、<tt>findByGroup()</tt>、<tt>findRecentlyCreated()</tt>，等等。</p>
+
+<p class="docText">还有一个问题就是对象可能变成一个“复制品”，这在 <tt>save()</tt> 方法的测试中可能会见到。例如，这个测试用例中的 <tt>$link</tt> 和 <tt>$link2</tt> 并不是同一个对象，尽管它们都指向相同的书签 <tt>ID</tt>。你也可以明确测试这个问题：</p>
+
+<pre>
+class ActiveRecordTestCase extends UnitTestCase {
+  // ...
+
+  function testSave() {
+    // ...
+    
+    <span class="docEmphStrong">$this-&gt;assertNotIdentical($link, $link2);</span>
+  }
+}
+</pre>
+
+<p class="docText">如果认为解决这个问题很重要，你可能需要增加一个内部 Registry(见第 5 章)，以确保 <tt>Bookmark(1)</tt> 返回的所有对象实例实际上是相同的对象。 因为实际上是使用 <tt>new</tt> 操作符创建对象，而不是 Factory 方法，为了真正地消除这个问题，你可能需要重构 <tt>Bookmark</tt> 类，把它当作实际的 Active Record 类的 Proxy(见第 11 章)。</p>
+
+<p class="docText">另一个方面，Active Record 模式被设计来每次处理一条记录。这是一个十分典型的应用程序“管理”界面，通过这个界面，你可以编辑一篇文章、一个链接、一篇评论或任何来自数据库的其它记录行，但是大多数 web 页都用于处理结果集或数据行集合，这正是下一章 —— Table Data Gateway 模式，要讨论的内容。</p>
+
+</tt><table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table></body>
+</html>

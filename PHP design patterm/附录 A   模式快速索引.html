@@ -1,0 +1,990 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>附录 A：Pattern Quick Reference —— 模式快速索引</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docPrefaceTitle">附录 A：Pattern Quick Reference —— 模式快速索引</h2>
+
+<p class="docText">设计模式的缺点之一就是它们实在是太多了 —— 本书差不多详细地介绍了其中二十来个，而且还有几个与 PHP 并不直接相关的设计模式。</p>
+
+<p class="docText">因此，我认为，当你准备寻找一个模式来解决一个特定的问题，但又不能清楚地记得你应该使用哪个模式的时候，有一个能够帮助你慢慢地唤起你的记忆的简单(而且，要感激的是，相对的简短)索引表将会非常方便。</p>
+
+<p class="docText">以下页面中的表为你提供了本书所涉及的每个模式的一个简短的概述，以及它是在哪一章介绍的，并指出了一些像书那样的外部资源。和索引一起，希望它能为你提供一个快速的方法，为每种情况定位相应的模式。</p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">AbstractFactory (抽象工厂)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">使一系列相关对象的建立更加容易</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">3</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 87</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">ActiveRecord</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">创建一个包装了来自一个数据库表或视图的一个记录行的对象，提供一次一行数据库访问，并且还封装了相关的业务逻辑。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">14</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page 160<br>Data Access Patterns—Page 33</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Adapter (适配器)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">允许类提供一个相似的接口，这样你就可以使用新的类，而不需要重构旧的代码。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">13</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 139<br />
+                           Agile Software Development—Page 317<br />
+                           Roles, Responsibilities and Collaborations—Page 340<br />
+                           Design Patterns Explained—Page 95<br />
+                           Advanced PHP Programming—Page 44</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">ApplicationControlle (应用控制器)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">一个应用程序处理导航的集中点，典型地实现在一个 index.php 文件中，基于 URL 查询参数进行分发。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">17</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText"> PoEAA—Page 379</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Builder (生成器)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">使复杂对象状态的初始化更加容易。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">3</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 97</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Command (命令)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">把一个请求封装为一个对象。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">17</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 233</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Composite (组合)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">用于管理一个对象集合，集合中的每个“部分”都可以代表“整体”。典型地用于组织一个树型分层结构。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">10, 17</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 163<br />
+                           Agile Software Development—Page 293</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">CustomTag (自定义标签)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">通过把内容封装成新的 HTML 标签，从而改善表现层的分离。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">17</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 139<br />
+                           PoEAA—Page 374<br />
+                           http://wact.sf.net/index.php/TemplateView</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">DataMapper (数据映射)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">一个充当了领域对象和数据库表之间的转换层的对象，它包含了相关的数据。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">16</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page 165<br />
+                           Data Access Patterns—Page 53</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Decorator (装饰)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText"></p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">为一个对象动态地添加职责。通过替换子类，能够简化类的继承。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 175<br />
+                           Design Patterns Explained—Page 241</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">DependencuInjection (依赖注入)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">通过构造函数或 setter 方法，构造可以接受合作者的类，所以一个框架能够聚集你的对象。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">17</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page ???<br />
+                           http://www.martinfowler.com/articles/injection.html</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">DomainModel (领域模型)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">一个包含了数据和行为的业务逻辑的对象模型。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">17</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page 116<br />
+                           Evans DDD</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">FactoryMethod (工厂方法)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">使对象的创建更加容易。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">3</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 107<br />
+                           Agile Software Development—Page 269<br />
+                           Design Patterns Explained—Page 285<br />
+                           Advanced PHP Programming—Page 54</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">FrontController (前端控制器)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">一个为 web 应用程序处理所有请求的控制器。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">17</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page 379</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Handle-Body (结构型)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">一个包含目标对象(例如，Proxy、Decorator 以及 Adapter)引用的设计模式的集合名词。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">N/A</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">http://www.c2.com/cgi/wiki?HandleBodyPattern</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Iterator (迭代器)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">方便地操纵对象集合。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">8</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 257</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">MockObject (模拟对象)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">提供一个占位程序，用于验证确定的方法在测试过程中是否被调用了。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">6,  附录 B</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">http://www.lastcraft.com/mock_objects_documentation.php<br />
+                           http://www.mockobjects.com/MocksObjectsPaper.html</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Model-View-Controlle (模型－试图－控制器，MVC)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">一个应用程序分层模式，它分离了你的领域模型、表现逻辑以及应用程序流程之间的关系。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">17</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page 330<br />
+                           http://wact.sf.net/index.php/ModelViewController</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">MonoState (状态监视器)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">允许一个对象的所有实例共享相同的状态。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">4</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">Agile Software Development—Page 177<br />
+                           http://c2.com/cgi/wiki?MonostatePattern<</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Observer (观察者)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">注册对象以便以后可以重新调用。基于事件的通知。也叫做 Publish/Subscribe。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">9</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 293<br />
+                           Agile Software Development—Page 297<br />
+                           Design Patterns Explained—Page 263</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Proxy (代理)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">提供通过一个代理对象来访问一个对象，允许延迟实例化或保护目标方法。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">11</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 207<br />
+                           PoEAA—Page 200<br />
+                           Agile Software Development—Page 327</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Registry (注册)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">通过一个单一的，众所周知的对象来管理对象的引用。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">5</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page 480</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">ServerStub (服务服务器)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">为测试的目的模拟你应用程序的一部分。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">6</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page 504</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Singleton (单件)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">提供对一个对象的单一实例的全局访问。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">4</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 127<br />
+                           Agile Software Development—Page 177<br />
+                           Design Patterns Explained—Page 255<br />
+                           Advanced PHP Programming—Page 56</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Specification (规范)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">按照动态的准则灵活地求对象的值。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">10</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">Evans DDD—Page 224, 273</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">State (状态)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">根据对象状态的变化让一个对象改变它的行为。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">7, 8</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 305</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Strategy (策略)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">通过创建具有一致接口的对象允许在可选的算法之间切换。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">6</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 315<br />
+                           Agile Software Development—Page 161<br />
+                           Roles, Responsibilities and Collaborations—Page 338<br />
+                           Design Patterns Explained—Page 229</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">TableDataGateway</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">一个充当了数据库表或视图网关的对象，提供对多行记录的访问。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">15</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page 165</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">TemplateView (模板视图)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">通过使用领域数据替换内嵌标记来渲染一个页面。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">17</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page 361</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">TemplateMethod (模板方法)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">用“挂钩(hook)”方法定义一个算法，允许子类不需要改变结构就可以改变它的行为。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">7, 12</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 325<br />
+                           Roles, Responsibilities and Collaborations—Page 330<br />
+                           Design Patterns Explained—Page 279<br />
+                           Advanced PHP Programming—Page 49</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">TransformView (转换视图)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">先处理领域数据，然后继续把它转换成某种输出形式。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">17</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page 361</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">ValueObject (值对象)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">用于处理对象，这种对象的等同性由对象属性的值来决定，而不是由对象的身份所决定。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">2</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page 486<br />
+                           Evans DDD—Page 99</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">ViewHelper (视图助手)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">一个帮助视图从模型(Model)收集数据的对象。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">17</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">PoEAA—Page 355</p></td></tr></tbody></table>
+
+<p></p>
+
+<table cellSpacing="0" cellPadding="5" rules="none" frame="void">
+  <colgroup>
+    <col width="70" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="thead" vAlign="top" scope="col" align="left" colSpan="2">
+        <p class="docText">Visitor (访问者)</p></th></tr></thead>
+  <tbody>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">摘要</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">把一个算法定义成一个对象，这个对象通过访问一个集合的每个成员来执行一个操作。</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">引用章</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">7, 10</p></td></tr>
+    <tr>
+      <th class="docTableCell" vAlign="top" align="left">
+        <p class="docText">其它资源</p></th>
+      <td class="docTableCell" vAlign="top" align="left">
+        <p class="docText">GoF—Page 331</p></td></tr></tbody></table>
+
+
+<h2 class="docBibliographyTitle">参考书目</h2>
+
+<ul class="docList">
+<li>GoF - Erich Gamma, Richard Helm, Ralph Johnson, John Vlissides Design Patterns: Elements of Reusable Object-Oriented Software. Addison-Wesley, 1995.</li>
+<li>PoEAA - Martin Fowler Patterns of Enterprise Application Architecture Addison-Wesley, 2003.</li>
+<li>Harry Fuecks, PHP Anthology: Object Oriented PHP Solutions, SitePoint Pty. Lt., 2003.</li>
+<li>Allen Holub, Holub on Patterns: Learning Design Patterns by Looking at Code, Apress, 2004.</li>
+<li>Robert Martin, Agile Software Development, Prentice Hall, 2003.</li>
+<li>Clifton Nock, Data Access Patterns, Addison-Wesley, 2004.</li>
+<li>George Schlossnagle, Advanced PHP Programming, SAMS, 2004.</li>
+<li>Alan Shalloway and James R. Trott, Design Patterns Explained, Addison-Wesley, 2005.</li>
+<li>Rebecca Wirfs-Brock and Alan McKean, Roles, Responsibilities and Collaborations, Addison-Wesley, 2003.</li>
+<li>Matt Zandstra, PHP 5 Objects, Patterns, Practice, Apress, 2004.</li>
+</ul>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

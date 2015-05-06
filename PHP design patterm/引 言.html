@@ -1,0 +1,213 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>引 言</title>
+<link rel="stylesheet" type="text/css" media="all" href="styles/pagesafari.css" />
+<link rel="stylesheet" type="text/css" media="all" href="styles/docsafari.css" />
+</head>
+
+<body>
+
+<h2 class="docPrefaceTitle">引 言</h2>
+
+<p class="docText">你是否曾经在着手处理你程序中的一个新特性时，却出乎意料地发现它的解决方案与你已经实现的某个方案惊人地相似？如果你是一个程序员，即使才很短的时间，你都可能回答“是的”。这就好比是用一些已有的代码来引导新的开发。你甚至可能会意识到，你的解决方案其实是一个基本方法，不仅仅可以被你，而且可以被所有的专业程序员广泛重复地使用。</p>
+
+<p class="docText">事实上，许多编程问题都会一再地出现(遇到)，而且很多用于解决它们的基本解决方案 —— 或称之为设计模式 —— 都已经形成了。简单来说，设计模式就是一个教你如何组织你的代码以利用可靠设计的模板。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">设计模式历史</p>
+
+<p class="docNoteText">“设计模式”这个术语最初被设计用于建筑学领域。Christopher Alexander 在他 1977 年所著的《A Pattern Language: Towns/Building/Construction》中描述了一些常见的建筑设计问题，并解释了如何通过已有的，众所周知的模式集来开始全新的，有效的设计。Alexander 的观念被很好地转化到了软件开发领域，在软件开发中，从之前已有的组件构造新的解决方案正是长期以来所追求的。</p>
+
+</div>
+
+<p class="docText">所有设计模式都有几个共同的特征：一个名字，一个问题陈述，和一个解决方案。</p>
+
+<ul class="docList">
+
+<li><p class="docText">设计模式的名字(<span class="docEmphasis">name</span>)非常重要，因为它允许你立即与其他程序员交流你代码的意图 —— 不过他们至少得熟悉模式 —— 而不需要过多地深入代码的细节。</p></li>
+
+<li><p class="docText">问题(<span class="docEmphasis">problem</span>)就是模式能够应用的领域</p></li>
+
+<li><p class="docText">解决方案(<span class="docEmphasis">solution</span>)描述了模式的实现。一个好的模式论述应该同时讨论使用这个模式的优点和缺点。</p></li>
+
+</ul>
+
+<p class="docText">模式是解决给定问题的有效方法。一个设计模式并非一个库 —— 一些可以在你的项目中包含并直接使用的代码 —— 而是一个组织你代码的模板。事实上，代码库和设计模式在应用上非常不同。</p>
+
+<p class="docText">举例来说，你从百货公司购买的一件现成的衬衫是一个代码库。它的颜色、样式和尺寸都是由设计师和厂商决定了的，但它满足你的需要。</p>
+
+<p class="docText">然而，如果商店里没有适合你的衬衫，那么你就得自己来做 —— 设计它的样式，选择布料，然后缝在一起。但除非你是一个裁缝，否则你也许会发现简单地找一个合适的模式，然后按着这个模式去设计自己的衣服就要容易得多。使用模式，你可以在更短的时间内得到一件成熟设计的衬衫。</p>
+
+<p class="docText">回到软件的讨论上来，数据库抽象层或内容管理系统就是一个库 —— 它是预先设计并已经编码好了的，如果它正好能满足你的需要，它就是一个很好的选择。但是如果你正在阅读本书，你就很可能会发现现有的解决方案对你来说并不总是适用。但是你知道你所要的，并能够实现它：你只需要用一个模式来指导你。</p>
+
+<p class="docText">最后一个想法：就像一个裁缝模式，就设计本身而言并没多大用处。毕竟，你不可能穿一个模型 —— 它仅仅是用薄纸拼凑起来的模型。同样，软件设计模式也只是一个引导。它还必须根据编程语言和你程序的特性和需求进行量体裁衣(特别设计)。</p>
+
+
+<h3 class="docSection1Title">本书的目标</h3>
+
+<p class="docText">本书的目的不是为了介绍一个全面的软件设计模式名录，也不是为了开发任何新的设计模式或术语，而是为了突出介绍一些已有的，知名的设计模式。值得一提的是，本书介绍了那些我自认为对开发动态 web 应用程序最有用的模式，并且演示了这些模式在 PHP 中的参考实现。</p>
+
+
+<h3 class="docSection1Title">面向对象编程</h3>
+
+<p class="docText">由于设计模式的本性，本书的大多数内容都是基于面向对象编程(Object Oriented Programming，OOP)的概念和习惯的。</p>
+
+<p class="docText">如果你不熟悉 OOP，有很多相关的资源 —— 书籍、网站、杂志，以及培训课程 —— 可以帮助你学习更多有关它的知识。大多数 OOP 资料都对代码重用、健壮性、封装、多态性和扩展性赞不绝口，当然它们每一个都非常重要和有用。然而，我认为 OOP 最主要的优点在于它鼓励你把手头的问题分解成易于处理的部分。程序被设计和实现为清晰的小块，这样你的代码就能够得到更加彻底的测试，而且更容易理解和维护。</p>
+
+
+<h3 class="docSection1Title">读者技能要求</h3>
+
+<p class="docText">本书假定你已经可以熟练地(fluent)使用 PHP。特别是假设你已经具备一定的 PHP 及其语法的应用知识，而且了解用 PHP 实现 OOP 的基本原理。本书并不打算介绍 PHP 编程，更不打算介绍用 PHP 进行 OOP 编程。</p>
+
+<p class="docText">由于并非所有的 OOP 开发人员都使用相同的术语，在有新术语引入的地方，我都在正文或注释(sidebar)中做了相应的定义。</p>
+
+
+<h3 class="docSection1Title">PHP4 与 PHP5</h3>
+
+<p class="docText">当我写这本书的时候，PHP5 已经发行有一段时间了，但是仍然还没有被公众团体广泛采用。在我自己的工作中，我已经开始把新的应用程序开发迁移到了 PHP 5.0.3，而且到目前为止，我对于它对 PHP4 代码的向后兼容性，以及它的全新的对象模型都十分满意。这个新的对象模型是 PHP5 最重要的新特性之一，同时也是我之所以采用它的最主要的驱动力。</p>
+
+<p class="docText">有很多很好的文章和教程涉及不同 PHP 版本的对象模型之间的细微差别，但简单说来，PHP5 提供了：</p>
+
+<ul class="docList">
+
+<li><p class="docText"><span class="docEmphasis">Object handles</span> - 对象句柄(将在下面解释，而且在第 2 章：值对象模式，还会做进一步的讨论)</p></li>
+
+<li><p class="docText"><span class="docEmphasis">Better constructors</span> - 更好的构造函数(使用统一的名字，而且不再允许改变 <tt>$this</tt>)</p></li>
+
+<li><p class="docText"><span class="docEmphasis">Destructors</span> - 析构函数</p></li>
+
+<li><p class="docText"><span class="docEmphasis">Visibility</span> - 可见性(<tt>public</tt>、<tt>protected</tt> 和 <tt>private</tt>，可用于方法和属性)</p></li>
+
+<li><p class="docText"><span class="docEmphasis">Exceptions</span> - 异常(一种使用新的 <tt>try{} catch{}</tt> 语法触发错误的替代方法)</p></li>
+
+<li><p class="docText"><span class="docEmphasis">Class constants</span> - 类常量(使用类作为命名空间的定义)</p></li>
+
+<li><p class="docText"><span class="docEmphasis">Reflection</span> - 反射(动态检查类、方法和参数)</p></li>
+
+<li><p class="docText"><span class="docEmphasis">Type hinting</span> - 类型提示(为方法和参数指定预期的类或接口)</p></li>
+
+</ul>
+
+<p class="docText">PHP5 还提供了另外几个模糊特性：</p>
+
+<ul class="docList">
+
+<li><p class="docText"><span class="docEmphasis">New magic methods</span> - 新的魔术方法(<tt>__get()</tt> 和 <tt>__set()</tt> 允许你控制属性存取；<tt>__call()</tt> 让你可以动态地拦截对对象的所有的方法调用；<tt>__sleep()</tt> 和 <tt>__wakeup()</tt> 让你可以重载串行化行为；<tt>__toString()</tt> 可以让你控制当对象被造型成字符串时如何表示它自己)</p></li>
+
+<li><p class="docText"><span class="docEmphasis">Autoloading</span> - 自动加载(允许最终用户在第一次引用对象时设法自动加载类)</p></li>
+
+<li><p class="docText"><span class="docEmphasis">Final</span>(禁止方法或类被子类重载)</p></li>
+
+</ul>
+
+
+<h3 class="docSection1Title">对象句柄</h3>
+
+<p class="docText">PHP5 带来的最好的消息就是，所有对象现在都用句柄(handles)来定义，类似于像文件那样的系统资源或数据库句柄。传递一个对象给一个 PHP 函数不再会隐含地创建这个对象的一个拷贝了。</p>
+
+<p class="docText">为了了解这之间的区别，考虑一下下面的两个例子：</p>
+
+<pre>
+// PHP4 class
+class ExampleP1 {
+  var $foo;
+
+  function setFoo($foo) {
+    $this-&gt;foo = $foo;
+  }
+
+  function getFoo() {
+    return $this-&gt;foo;
+  }
+}
+
+function changeExample($param) {
+  $param-&gt;setFoo('blah');
+  return $param-&gt;getFoo();
+}
+
+$obj = new ExampleP1;
+$obj-&gt;setFoo('bar');
+
+echo $obj-&gt;getFoo(); // bar
+echo ChangeExample($obj); //blah
+echo $obj-&gt;getFoo(); // bar
+</pre>
+
+<p class="docText">在 PHP4 中，<tt>changeExample()</tt> 中的 <tt>$param</tt> 变量包含的是 <tt>$obj</tt> 的一个拷贝，因此，这个函数并没有修改原来对象中的 <tt>$foo</tt> 值，于是最后的 <tt>$obj-&gt;getFoo()</tt> 输出“<tt>bar</tt>”。</p>
+
+<p class="docText">在 PHP5 中，由于 <tt>$obj</tt> 是当作一个句柄传递的，同样的 <tt>changeExample()</tt> 函数确确实实影响了原来的对象。换句话说，使用句柄，不会再创建一个拷贝，因而 <tt>$param</tt> 实际上就是 <tt>$obj</tt> 实例。</p>
+
+<pre>
+// PHP5 class
+class ExampleP2 {
+  protected $foo;
+
+  function setFoo($foo) {
+    $this-&gt;foo = $foo;
+  }
+
+  function getFoo() {
+    return $this-&gt;foo;
+  }
+}
+
+$obj = new ExampleP2;
+$obj-&gt;setFoo('bar');
+
+echo $obj-&gt;getFoo(); // bar
+echo ChangeExample($obj); //blah
+echo $obj-&gt;getFoo(); // IMPORTANT, produces blah
+</pre>
+
+<p class="docText">当你在对象的构造函数里面把 <tt>$this</tt> 传递给其它对象或函数时，这个问题甚至会变得更加复杂。</p>
+
+<p class="docText">这可以归结为，在 PHP4 中，你(几乎)总是需要：</p>
+
+<ul class="docList">
+
+<li><p class="docText">通过引用创建对象，就像 <tt>$obj =&amp; new Class</tt> 中那样；</p></li>
+
+<li><p class="docText">通过引用传递对象，如 <tt>function funct(&amp;$obj_param) {}</tt>；</p></li>
+
+<li><p class="docText">通过引用捕捉对象，如 <tt>function &amp;some_funct() {} $returned_obj =&amp; some_funct()</tt>。</p></li>
+
+</ul>
+
+<p class="docText">现在，在一些情况下，你实际需要的是原来对象的一个拷贝。在我的 PHP4 代码中，我总是注明对象的任何非引用赋值为有意的拷贝。在长期的运行中，这样一个简短的注释可以减轻你或任何其他维护你的代码的人的大量的头痛。引用传递、对象句柄，以及对象拷贝将在第 2 章，值对象模式中进行非常详细的研究。</p>
+
+<p class="docText">尽管我个人偏向转移到 PHP5 开发，但我感觉到，相当长一段时间内，PHP4 仍将继续伴随我们，而且现有的公共项目应该也会继续支持它。最后，本书尝试对两个版本的 PHP 提供同等的支持。只要有可能，就会同时提供 PHP4 和 PHP5 版本的范例代码并进行相应的解释。 在每一章里面，每一个从一个 PHP 版本改变到另一个版本的代码块都会有一个 <tt>// PHP4</tt> 或 <tt>// PHP5</tt> 这样的注释来指出其改变。接下来的代码块都用的是相同的 PHP 版本，直到下一次转换指出。</p>
+
+
+<h3 class="docSection1Title">其它资源和参考书目</h3>
+
+<p class="docText">有很多很好的参考书可以帮助你学习更多有关设计模式的知识。由 Erich Gamma、Richard Helm、Ralph Johnson 和 John Vlissides(他们的开山之作经常被称为“四人帮”(Gang of Four)，或简写为“GOF”，其实就是代表他们四个作者)合著的《设计模式：可复用面向对象软件的基础》(<span class="docEmphasis">Design Patterns: Elements of Reusable Object-Oriented Software</span>)是设计模式的“圣经”。本书也始终使用 GOF 的模式命名作为规范的原始资料。</p>
+
+<p class="docText">跟着“设计模式”，下一本对 PHP web 应用程序开发人员最有用的设计模式书籍是由 Martin Fowler 所著的《企业应用程序架构模式》(<span class="docEmphasis">Patterns of Enterprise Application Architecture</span>)。与 GOF 中涵盖了所有一般的模式相比，Fowler 的这本书详细地介绍了许多专门用于 web 应用程序开发任务的模式。</p>
+
+<p class="docText">网上也提供了很多很好的有关设计模式的资源。其中一个特别出色的就是在 <a class="docLink" target="_blank" href="http://c2.com/ppr/">http://c2.com/ppr/</a> 的波特兰模式库(<span class="docEmphasis">Portland Pattern Repository</span>)。</p>
+
+<p class="docText">另外一个不错的用 PHP 实现参考模式的站点是 phpPatterns，其在线地址是 <a class="docLink" target="_blank" href="http://www.phppatterns.com/">http://www.phppatterns.com/</a>。</p>
+
+
+<h3 class="docSection1Title">致谢</h3>
+
+<p class="docText">首先，我得感谢我的老板，在他那里，我的任务和职责允许我把一部分时间花在这个我所热爱的领域，从而为我提供了知识和经验，让我有信心编写本书。</p>
+
+<p class="docText">我的灵感、想法和经验的另一个来源是 SitePoint(<a class="docLink" target="_blank" href="http://www.sitepoint.com/">http://www.sitepoint.com/</a>) 论坛。特别值得一提的是，那些“Advanced PHP Forum”的正式投稿人都拥有丰富的经验和知识，他们是我在网上所发现的最慷慨的和最有帮助的，并且乐于共享他们的经验和知识的团体之一。也正是通过这些资源，我认识了 SimpleTest(<a class="docLink" target="_blank" href="http://simpletest.sf.net/">http://simpletest.sf.net/</a>)，WACT(<a class="docLink" target="_blank" href="http://wact.sf.net/">http://wact.sf.net/</a>) 和其它很多我认为无价的 PHP 项目。在接下来的岁月，我希望 SitePoint 能够继续成为 PHP 开发人员的主要知识来源。</p>
+
+<p class="docText">很明显，没有 PHP 开发团队的不懈努力和贡献，这本书根本就不可能存在。正是他们开发了一种有用、易学、通用，而且非常适合 web 应用程序开发的语言。</p>
+
+<p class="docText">最后，我还要感谢 Marco Tabini 和 php|architect 的全体成员。这本杂志已经成了众多不同 PHP 主题的原始资料，而且都是由知识渊博的专业开发人员提供来共享的。另外，由 Marco 和公司主办的研讨会也是一个重要的知识来源。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

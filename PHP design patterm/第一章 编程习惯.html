@@ -1,0 +1,401 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第一章 Programming Practices —— 编程习惯</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第一章 Programming Practices —— 编程习惯</h2>
+
+<p class="docText">学习一种新技术就意味着采用新的习惯。本章将会介绍，或许只是重新强调几种编程习惯，当你在你的代码中实现设计模式的时候，你很可能会发现这些习惯非常有用。</p>
+
+<p class="docText">这里总结的很多习惯都值得用单独的一章，甚至是一整本书来介绍。你应该把本章看着是对用 PHP 进行与设计模式相关的习惯的初步介绍，并查看列出的参考来进行进一步的研究。</p>
+
+
+<h3 class="docSection1Title">Testing Your Code(测试你的代码)</h3>
+
+<p class="docText"><span class="docEmphasis">大概没有什么编码习惯比测试你的代码更重要了</span>。好的测试可以带来极大的自由度。</p>
+
+<p class="docText">咋一听，这句“格言”似乎与你的直觉相矛盾。如果要说有什么区别的话，你可能会断言：测试似乎更像自由度的障碍。</p>
+
+<p class="docText">事实上恰恰相反：如果完整测验了你的软件的公共接口的那些测试能够运行的话，你就可以改变你的内部实现，而不会改变(或更糟糕一点的话，甚至会破坏)现有的系统。测试验证了你所发布的接口的正确性和准确性，让你可以放心地改变你代码的内部工作机制，完全可以相信它仍然正确而且不用担心有 bug —— 也就是说没有引入新的 bug 或再次引入旧的 bug。</p>
+
+<p class="docText">在讨论更多关于测试的好处之前，我们先来看一个例子。本书所有的测试都使用 SimpleTest PHP 测试框架，可以在 <a class="docLink" target="_blank" href="http://simpletest.org/">http://simpletest.org/</a> 得到。</p>
+
+<p class="docText">考虑下面这段代码：</p>
+
+<pre>
+&lt;?php
+  // PHP4
+  // the subject code
+  define('TAX_RATE', 0.07);
+
+  function calculate_sales_tax($amount) {
+    round($amount * TAX_RATE, 2);
+  }
+
+  // include test library
+  require_once 'simpletest/unit_tester.php';
+  require_once 'simpletest/reporter.php';
+
+  // the test
+  class TestingTestCase extends UnitTestCase {
+    function TestingTestCase($name = '') {
+      $this-&gt;UnitTestCase($name);
+    }
+
+    function TestSalesTax() {
+      $this-&gt;assertEqual(7, calculate_sales_tax(100));
+    }
+  }
+
+  // run the test
+  $test = new TestingTestCase('Testing Unit Test');
+  $test-&gt;run(new HtmlReporter());
+?&gt;
+</pre>
+
+<p class="docText">上面的代码首先定义了一个常量，<tt>TAX_RATE</tt>，然后定义了一个计算销售所得税的函数。接着，代码包含了所需的  SimpleTest 组件：单元测试程序本身和一个用于显示测试结果的“reporter”模块。</p>
+
+<p class="docText">测试本身，<tt>TestingTestCase</tt>，是一个类，它扩展了 SimpleTest 的 <tt>UnitTestCase</tt> 类。通过扩展 <tt>UnitTestCase</tt>，<tt>TestingTestCase</tt> 中所有以 <tt>Test</tt> 打头的方法都会被用作测试用例 —— 创建条件来验证你的代码并断言结果的代码。</p>
+
+<p class="docText"><tt>TestingTestCase</tt> 定义了一个测试，<tt>TestSalesTax()</tt>，它包含一个 <tt>assertEqual()</tt> 断言。如果它的前两个参数相等，这个断言就能通过，否则就会失败。(如果你想在 <tt>assertEqual()</tt> 失败时显示详细的信息，可以像 <tt>$this-&gt;assertEqual(7, calculate_sales_tax(100), &quot;The sales tax calculation failed&quot;)</tt> 中那样，传递第三个参数。)</p>
+
+<p class="docText">代码的最后两行创建了这个测试用例的一个实例，并用 <tt>HtmlReporter</tt> 来运行。你也可以简单地通过访问它的 web 页面来运行这个测试用例。</p>
+
+<p class="docText">运行这个测试将显示测试名称，任何失败断言的详细信息，以及一个总结“条”。(绿条象征成功(所有断言都通过了)，而红条则象征失败(至少有一个断言没能通过))</p>
+
+<p class="docText">上面的代码有一个(故意的)错误，因此运行它会产生如下的失败：</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" width="742" height="164" src="images/ch01sec01No.01.gif" /></center></p>
+
+<p class="docText"><tt>calculate_sales_tax()</tt> 这么一个简单的，才一行的函数又会产生什么错误呢？你可能已经注意到了，原因是这个函数没有返回结果。下面是正确的函数：</p>
+
+<pre>
+function calculate_sales_tax($amount) {
+  return round($amount * TAX_RATE, 2);
+}
+</pre>
+
+<p class="docText">用正确的代码运行，测试通过。“<span class="docEmphasis">如果条是绿色的，代码就是正确的。</span>”</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch01sec01No.02.gif" /></center></p>
+
+<p class="docText">但是，一个简单的测试并不能保证代码就是健壮的。例如，如果把 <tt>calculate_sales_tax()</tt> 改写成 <tt>calculate_sales_tax($amount) { return 7; }</tt>，测试一样可以通过，但只有当 1 美元等于 100 分时才是正确的。你也可以增加额外的 <tt>Test</tt> 方法来测试其它静态值 ...</p>
+
+<pre>
+function TestSomeMoreSalesTax() {
+  $this-&gt;assertEqual(3.5, calculate_sales_tax(50));
+}
+</pre>
+
+<p class="docText">... 或修改 <tt>TestSalesTax()</tt> 来验证第二个(第三个，等等)值：</p>
+
+<pre>
+function TestSalesTax() {
+  $this-&gt;assertEqual(7, calculate_sales_tax(100));
+  $this-&gt;assertEqual(3.5, calculate_sales_tax(50));
+}
+</pre>
+
+<p class="docText">然而，还有一种更好的方法，你可以另外增加一个随机选择值的测试，来为你的代码提供更大的可信度：</p>
+
+<pre>
+function TestRandomValuesSalesTax() {
+  $amount = rand(500, 1000);
+
+  $this-&gt;assertTrue(defined('TAX_RATE'));
+
+  $tax = round($amount * TAX_RATE * 100) / 100;
+  $this-&gt;assertEqual($tax, calculate_sales_tax($amount));
+}
+</pre>
+
+<p class="docText"><tt>TestRandomValuesSalesTax()</tt> 引入了 <tt>assertTrue()</tt>，如果它的第一个参数等于布尔值 <tt>true</tt>，它就会通过。(和 <tt>assertEqual()</tt> 一样，<tt>assertTrue()</tt> 也可以接受一个可选的第三个参数来显示详细的失败信息。) 因此，<tt>TestRandomValuesSalesTax()</tt> 首先断言 <tt>TAX_RATE</tt> 已经定义好了，然后用这个常量根据随机选择的数量计算税收应该是多少。</p>
+
+<p class="docText">可是，<tt>TestRandomValuesSalesTax()</tt> 也存在一个问题：它很大程度上依赖于 <tt>calculate_sales_tax()</tt> 函数的实际实现细节，这或许不是理想的测试。理想的测试应该与具体的实现细节无关。下面的测试假设并断言销售税率永远不会大于 <tt>20%</tt>：</p>
+
+<pre>
+function TestRandomValuesSalesTax() {
+  $amount = rand(500, 1000);
+  $this-&gt;assertTrue(calculate_sales_tax($amount) &lt; $amount * 0.20);
+}
+</pre>
+
+<p class="docText">确保你的代码可以正常工作是测试的首要好处，但是通过彻底地测试你的代码，你可以认识到还有一些另外的，次要的好处：</p>
+
+<ul class="docList">
+
+<li><p class="docText">测试强制你编写易于测试的代码。这导致了松散耦合，灵活的设计，以及很好的模块性。</p></li>
+
+<li><p class="docText">编写测试可以促使你明确地阐明你的代码的预期行为，从一开始就进行有针对性的设计。编写测试也可以促使你考虑所有可能的输入以及相应的响应结果。</p></li>
+
+<li><p class="docText">测试是一种交流你的代码目的的非常明确的方法。换句话说，测试用例扮演了示例和文档的功能，正确地显示了一个给定的类、方法，或函数应该如何运行。本书中，有的时候，我就是通过一个测试用例来演示代码的预期行为的。通过阅读测试方法的断言，你就能明白代码是如何运行的。测试用例以明确的方式定义了代码是如何工作的。</p></li>
+
+</ul>
+
+<p class="docText">最后，如果你的测试集(test suite) —— 一系列测试用例 —— 非常彻底，那么当所有的测试都通过时，你就可以说你的代码完成了。有趣的是，这种观点正是测试驱动开发的特征之一。</p>
+
+<p class="docText">Test Driven Development(测试驱动开发，TDD)，也指 Test First Coding(测试优先编码)，是一种把测试提前一步的方法：永远在编写任何代码之前先编写测试。在 <a class="docLink" target="_blank" href="http://xprogramming.com/xpmag/testFirstGuidelines.htm">http://xprogramming.com/xpmag/testFirstGuidelines.htm</a> 可以找到一篇有关 TDD 的非常好的简短摘要, 另外还有一本关于这个策略的入门书籍，叫做《Test Driven Development: By Example》，由 Kent Beck 编写。(这本书的例子都是用 Java 写的，但它是一本快速读物，而且对这个主题作了一个非常好的概观和初步介绍)</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">Agile Development(敏捷开发)</p>
+
+<p class="docNoteText">最近，单元测试 —— 尤其是测试驱动开发 —— 已经和敏捷开发技术联系到了一起，比如极限编程(Extreme Programming，XP)。极限编程集中于加快将能够正常工作的代码发布给客户的迭代过程，并把客户需求改变作为开发过程正常的部分。下面是一些学习敏捷开发技术的非常好的在线资源：</p>
+
+<ul class="docList">
+
+<li><p class="docNoteText">http://en.wikipedia.org/wiki/Agile_software_development</p></li>
+
+<li><p class="docNoteText">http://agilemanifesto.org/</p></li>
+
+<li><p class="docNoteText">http://www.extremeprogramming.org/</p></li>
+
+</ul>
+
+</div>
+
+<div class="docNote">
+
+<p class="docNoteTitle">测试函数</p>
+
+<p class="docNoteText">本书所显示的大部分例子都是在测试面向对象代码，但是任何编程形式都能够从中获益。单元测试框架，比如 PHPUnits 或 SimpleTest，也都能非常容易地测试函数。比如上面那个 SimpleTest 例子，它就是用来测试 calculate_sales_tax() 函数的。世界各地的程序员们：请把单元测试用例也放到你的函数库里面吧！</div>
+
+<p class="docText">我希望经过这些讨论之后，你也会被调动起来 —— “测试引导！”(Test infected)(这个术语，由 Erich Gamma 创造，在 <a class="docLink" target="_blank" href="http://junit.sourceforge.net/doc/testinfected/testing.htm">http://junit.sourceforge.net/doc/testinfected/testing.htm</a> 有一篇详细讨论的文章)。就像 Gamma 所写的那样，刚开始你可能会觉得测试很厌烦，但是当你开始为你的软件搭建好了一个广阔的测试集之后，你就会对你所有的代码更加自信。</p>
+
+
+<h3 class="docSection1Title">重构</h3>
+
+<p class="docText">即使最有想法，最熟练的程序员也不可能预见软件项目中的每一个细微差别和微妙之处。问题总是出乎预料地突然出现，需求也可能，而且确确实实会变化，结果就是，代码被不断细化，共享，最后不得不废弃。</p>
+
+<p class="docText">重构就是检查你所有的代码，找出其中能够统一和简化的公共部分和相似之处，从而使代码更容易维护和扩展的编码习惯。重构也包括识别什么时候可以用一个设计模式来解决一个问题 —— 这也使解决方案更加简单。</p>
+
+<p class="docText">重构可以就像重命名一个属性或方法那样简单，或者也可以像破坏一个现有的类那么复杂。修改你的代码，使它符合一个或更多的设计模式是另一种方式的重构 —— 读过这本书后，你就可能会去实现。</p>
+
+<p class="docText">没有什么比用一个例子能更好地解释重构了。</p>
+
+<p class="docText">我们需要两个简单的类，<tt>CartLine</tt> 和 <tt>Cart</tt>。<tt>CartLine</tt> 用于记录增加到购物车的每件物品的单价和数量。例如，<tt>CartLine</tt> 可能记录了“<tt>四件红色的 polo 衬衫，每件 $19.99</tt>”。<tt>Cart</tt> 是一个容纳一个或更多 <tt>CartLine</tt> 对象的容器，并能够执行一些相关的计算，比如购物车中所有物品的总价。</p>
+
+<p class="docText">下面就是 <tt>Cartline</tt> 和 <tt>Cart</tt> 的一个简单实现：</p>
+
+<pre>
+// PHP5
+class CartLine {
+  public $price = 0;
+  public $qty = 0;
+}
+
+class Cart {
+  protected $lines = array();
+
+  public function addLine($line) {
+    $this-&gt;lines[] = $line;
+  }
+
+  public function calcTotal() {
+    $total = 0;
+
+    // add totals for each line
+    foreach ($this-&gt;lines as $line) {
+      $total += $line-&gt;price * $line-&gt;qty;
+    }
+
+    // add sales tax
+    $total *= 1.07;
+
+    return $total;
+  }
+}
+</pre>
+
+<p class="docText">重构的第一步是必须对你的代码有足够的测试覆盖率。这样才能保证你修改后的代码不会产生和原来代码不同的结果。顺便说一下，除非你改变了需求(也就是你代码的预期结果)，或者在测试用例中发现了错误，否则就不应该改变你的测试。</p>
+
+<p class="docText">下面就是一个对 <tt>CartLine</tt> 和 <tt>Cart</tt> 进行测试的例子，在重构过程中它不会发生变化：</p>
+
+<pre>
+function TestCart() {
+  $line1 = new CartLine;
+  $line1-&gt;price = 12;
+  $line1-&gt;qty = 2;
+
+  $line2 = new CartLine;
+  $line2-&gt;price = 7.5;
+  $line2-&gt;qty = 3;
+
+  $line3 = new CartLine;
+  $line3-&gt;price = 8.25;
+  $line3-&gt;qty = 1;
+
+  $cart = new Cart;
+  $cart-&gt;addLine($line1);
+  $cart-&gt;addLine($line2);
+  $cart-&gt;addLine($line3);
+
+  this-&gt;assertEqual((12*2 + 7.5*3 + 8.25) * 1.07,
+                    $cart-&gt;calcTotal());
+}
+</pre>
+
+<p class="docText">查看一下 <tt>CartLine</tt> 和 <tt>Cart</tt> 的代码，你可能会发现几种“编码味道”(code smells) —— 样子古怪，而且表面上看起来有问题的代码 —— 那些正是很可能需要重构的地方。(更多有关编码味道的内容，参见 <a class="docLink" target="_blank" href="http://c2.com/cgi/wiki?CodeSmell">http://c2.com/cgi/wiki?CodeSmell</a>)。两个最直接的重构的地方就是注释和涉及到总计和销售税计算的那些行。重构的一种形式，抽取方法(Extract Method)，将把这些丑陋的代码块从 <tt>Cart::calcTotal()</tt> 流程中抽取出来，并用一个适当命名的方法来替代它们，从而使整个流程更加清晰。</p>
+
+<p class="docText">例如，你可以增加两个计算方法，<tt>lineTotal()</tt> 和 <tt>calcSalesTax()</tt>：</p>
+
+<pre>
+protected function lineTotal($line) {
+  return $line-&gt;price * $line-&gt;qty;
+}
+
+protected function calcSalesTax($amount) {
+  return $amount * 0.07;
+}
+</pre>
+
+<p class="docText">现在，你可以像下面这样重写 <tt>calcTotal()</tt>：</p>
+
+<pre>
+public function calcTotal() {
+  $total = 0;
+  foreach ($this-&gt;lines as $line) {
+    $total += $this-&gt;lineTotal($line);
+  }
+  $total += $this-&gt;calcSalesTax($total);
+
+  return $total;
+}
+</pre>
+
+<p class="docText">迄今为止所做的改动都很有意义(至少在这个例子中是这样)，它对于暂停并重新运行测试来验证结果依然正确是很有帮助的。记住，一个绿条就意味着成功！</p>
+
+<p class="docText">然而，当前的代码依然存在一些可以挑剔的地方：新的 <tt>lineTotal()</tt> 方法中的对 <tt>public</tt> 属性的访问就是其中之一。很明显，计算总计的职责不应该属于 <tt>Cart</tt> 类，而应该属于 <tt>CartLine</tt>。</p>
+
+<p class="docText">再次重构，给 <tt>CartLine</tt> 增加一个 <tt>total()</tt> 方法来计算订单中每个物品的总价 ...</p>
+
+<pre>
+public function total() {
+  return $this-&gt;price * $this-&gt;qty;
+}
+</pre>
+
+<p class="docText">... 然后把 <tt>lineTotal()</tt> 方法从 <tt>Cart</tt> 中删除，并修改 <tt>calcTotal()</tt> 方法来使用新的 <tt>CartLine::total()</tt> 方法。然后重新运行测试，期待绿条的出现。</p>
+
+<p class="docText">重新重构后的代码如下：</p>
+
+<pre>
+class CartLine {
+  public $price = 0;
+  public $qty = 0;
+
+  public function total() {
+    return $this-&gt;price * $this-&gt;qty;
+  }
+}
+
+class Cart {
+  protected $lines = array();
+
+  public function addLine($line) {
+    $this-&gt;lines[] = $line;
+  }
+
+  public function calcTotal() {
+    $total = 0;
+    foreach ($this-&gt;lines as $line) {
+      $total += $line-&gt;total();
+    }
+    $total += $this-&gt;calcSalesTax($total);
+
+    return $total;
+  }
+
+  protected function calcSalesTax($amount) {
+    return $amount * 0.07;
+  }
+}
+</pre>
+
+<p class="docText">现在，代码不再需要内部注释了，因为代码本身就很好地说明了每一行的功能。新的方法更好地封装了计算，如果将来计算必须改变(比如说，考虑使用不同的销售税率的情况)，可以提供更大的灵活性。另外，类现在也更稳定，更容易维护了。</p>
+
+<p class="docText">这个例子显然是微不足道的，但还是希望你能从中推断并预想出如何重构你自己的代码。</p>
+
+<p class="docText">在进行编码的时候，你应该处于两种模式中的一种：增加特性或重构代码。增加特性的时候，编写测试并增加代码。重构的时候，则只改变已有的代码，并确保所有相关的测试依然能够正常运行。</p>
+
+<p class="docText">关于重构的最主要的参考是由 Martin Fowler 所著的《重构：改善既有代码的设计》(<span class="docEmphasis">Refactoring: Improving the Design of Existing Code</span>)。大胆地把 Fowler 的书简单地总结为几个要点，重构的步骤如下：</p>
+
+<ul class="docList">
+
+<li><p class="docText">确定需要重构的代码</p></li>
+
+<li><p class="docText">建立覆盖所有代码的测试</p></li>
+
+<li><p class="docText">小步进行</p></li>
+
+<li><p class="docText">每一步之后都运行你的测试。编码和测试频繁地交替进行 —— 相比编译型语言而言，像 PHP 这样的解释型语言就要容易得多。</p></li>
+
+<li><p class="docText">使用重构来使你的代码有更好的可读性并改善其性能。</p></li>
+
+</ul>
+
+
+<h3 class="docSection1Title">其它编程习惯</h3>
+
+<p class="docText">还有另外几种值得一提，而且值得与你自己的编码风格结合的习惯。</p>
+
+
+<h4 class="docSection2Title">UML</h4>
+
+<p class="docText">UML(Unified Modeling Language，统一建模语言，综合了 Booch、Rumbaugh 和 Jacobson 提出的表示法) 是一种独立于编程语言和程序员的编程表示法，用于描述面向对象编程概念。关于 UML 的总的说明可以在 <a class="docLink" target="_blank" href="http://www.uml.org/">http://www.uml.org/</a> 找到。</p>
+
+<p class="docText">UML 涉及很多方面，但对 PHP 程序员来说，最相关的两个方面是类图(class diagram)和序列图(sequence diagram)。</p>
+
+<p class="docText">类图描述了一个或多个类，以及这些类在程序中是如何彼此关联的。每个类都表示为一个方框，并分为三个部分：第一部分是类的名字；第二部分列举了类的属性(变量)；而最后一个部分则列出了类的方法。属性和方法的可见性分别用 <tt>+</tt> 表示 <tt>public</tt>，<tt>-</tt> 表示 <tt>private</tt>，以及 <tt>#</tt> 代表 <tt>protected</tt>。</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch01sec03No.01.gif" /></center></p>
+
+<p class="docText">序列图阐明了为处理一个特定任务或事件，对象在代码中的典型交互过程。序列图向你传达了不同的方法是什么时候调用的，由谁，以及以什么样的顺序调用的(“序列图”这个名字就是由此而来)。序列图是与其他开发人员交流一系列对象之间的相互交互的非常有用的工具。</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch01sec03No.10.gif" /></center></p>
+
+<p class="docText">在我自己的工作中，我经常同时使用这两种图来描述设计，但很少把它们形成项目文档。通常，随着你对系统的逐步认识，以及用户需求的变化，对象之间的关系也会改变，然后 UML 图也就会很快过时。可以说，“<span class="docEmphasis">一张图胜过千言万语</span>”。这些图在与新的开发人员交流系统设计时非常有用，而且也可以作为使用你软件的开发人员的参考手册。</p>
+
+
+<h4 class="docSection2Title">资源控制</h4>
+
+<p class="docText">“<span class="docEmphasis">尽早并经常地保存代码</span>”是另一条重要的程序员格言。即使你是在独自开发一个项目，你也应该把所有的资源都保持在控制之下。</p>
+
+<p class="docText">尽管有很多资源控制解决方案，但其中最出色的两个是：CVS(<a class="docLink" target="_blank" href="https://www.cvshome.org/">https://www.cvshome.org/</a>) 和 Subverion(<a class="docLink" target="_blank" href="http://subversion.tigris.org/">http://subversion.tigris.org/</a>)。CVS 是一个非常流行的解决方案，PHP 和 Apache 项目都用的是它。然而，Subversion 正快速成为一个流行的替代方案，因为它的设计克服了 CVS 的几个缺点(尤其是在单元提交以及移动/重命名目录和文件方面)。不过，运行 Subversion 服务的项目还很少。</p>
+
+<p class="docText">在工作中，我也使用 CVS 来管理项目，但本书的章节和代码保存在一个 Subversion 资料库中。</p>
+
+
+<h4 class="docSection2Title">源代码文档</h4>
+
+<p class="docText">如果你浏览一下本书的页面，你可能会注意到一些清楚格式化的注释块，类似于：</p>
+
+<pre>
+/**
+ * funny multi-line comments
+ * @something what is this?
+ */
+</pre>
+
+<p class="docText">这些被称作“文档块”(docblock)，可以被像 phpDocumentor(<a class="docLink" target="_blank" href="http://phpdocu.sf.net/">http://phpdocu.sf.net/</a>) 那样的程序使用，为你的 PHP 项目自动生成相应的应用程序接口(API)文档。</p>
+
+<p class="docText">文档块是特殊格式化的多行注释，以 <tt>/**</tt> 开始，接下来的每一行都以一个 <tt>*</tt> 打头，最后以 <tt>*/</tt> 结束。另外，在每个前缀前都允许留有空白(这样可以允许文档块以与代码相同的层次缩进)。</p>
+
+<p class="docText"><tt>@something</tt> 代表一个“标签”(tag)，用来在文档被转换为解析格式时阐明一些必要的信息。以 <tt>@private</tt> 标签为例，它被用在 PHP4 中，标识类的一个方法或属性是 <tt>private</tt> 的，因为语言本身没有提供可见性的功能(在 PHP4 中，所有方法和变量都是 <tt>public</tt> 的)。</p>
+
+<p class="docText">像文档块这样的源代码文档既可以作为一份有用的参考资料，也可以用来为开源项目做广告。其中一个例子(也是由我帮忙维护的)，就是在 <a class="docLink" target="_blank" href="http://simpletest.org/">http://simpletest.org/</a> 的 SimpleTest API 文档。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,540 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第十二章 The Decorator Pattern —— 装饰模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第十二章 The Decorator Pattern —— 装饰模式</h2>
+
+<p class="docText">如果你已经开发过面向对象的 PHP 代码，即使只有很短的时间，或已经在本书中来到了这么远，你知道，你可以通过继承 —— 一个任何面向对象编程语言都有的基本特性，改变或增加一个类的功能。如果一个已有的 PHP 类缺少一个方法，或一个已有的方法需要更加“感性”一点，你只需要简单地把这个类扩展为一个新类，并加入附加的代码。</p>
+
+<p class="docText">但子类化并不总是可行或恰当的。如果你想在一个对象已经被实例化后改变它的行为会怎样？或者，如果你想些微扩展许多类的行为又该如何？前者只能在运行时进行，而后者是明显可能的，但那样可能导致只有细微差别的类的大量繁殖 —— 一场维护噩梦。</p>
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">如何组织你的代码，不需要在类中直接放置额外的代码，就可以方便地增加有条件的或很少用到的功能？</p>
+
+
+<h3 class="docSection1Title">解决方案</h3>
+
+<p class="docText">Decorator 模式为子类化提供了一种灵活的选择。Decorator 允许你动态地修改对象，增加功能，而不会引起“子类爆炸”。</p>
+
+<p class="docText">当用于一系列子类时，Decorator 尤其有用。如果你有一系列子类(从相同的超类衍生而来)，而且需要增加另外的，可能独立于子类提供的功能，你就可以使用 Decorator 来避免代码复制和具体子类数目的增加。</p>
+
+<p class="docText">这个观点用一些范例类图最容易理解。考虑一个基于“部件”概念的简单表单库，在库中，你想表示的每种表单控件都有一个与之对应的类。这样的类图可能看起来像：</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch12sec02No.01.gif" /></center></p>
+
+<p class="docText"><tt>Select</tt> 和 <tt>TextInput</tt> 都是 <tt>Widget</tt> 的子类。假设你想增加一个“<tt>labeled</tt>”部件，一个告诉你输入目的的输入表单。因为任何给定的表单控件都可能需要标示，你可以像下面这样子类化每个具体部件：</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch12sec02No.10.gif" /></center></p>
+
+<p class="docText">这个类图看起来还不算太坏，因此让我们再增加另一个功能。在表单验证的时候，如果一个表单控件无效，你希望能够指出来。再一次，应用到一个“无效”控件的代码也需要应用到所有的其它部件，因此又会产生大量的子类：</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch12sec02No.20.gif" /></center></p>
+
+<p class="docText">这里，子类爆炸并不是唯一的问题。可以想象，所有复制代码现在已经遍布你的整个类层次了。一定有一个更好的方法！的确，Decorator 模式正是去除这种混乱的方法。</p>
+
+<p class="docText">Decorator 模式在结构上与 Proxy 模式(见第 11 章)非常相似。Decorator 对象持有一个对象的引用，并如实地重建被装饰对象的 <tt>public</tt> 接口。但 Decorator 也可以增加方法、扩展被装饰对象的接口或任意重载方法，甚至还可以在脚本执行期间有条件地重载。</p>
+
+<p class="docText">为了研究 Decorator 模式，我们采用之前讨论的表单部件库概念，并用 Decorator 模式代替继承来实现标示和无效功能。</p>
+
+
+<h3 class="docSection1Title">范例代码</h3>
+
+<p class="docText">部件库应该可以：</p>
+
+<ul class="docList">
+
+<li><p class="docText">容易创建表单元素；</p></li>
+
+<li><p class="docText">把表单元素输出为一个 HTML 表单；</p></li>
+
+<li><p class="docText">对每个元素执行一些简单的验证。</p></li>
+
+</ul>
+
+<p class="docText">对于这个例子，我们创建一个包含名、姓和 email 地址等输入域的表单。所有域都应该是必需的，而且 email 地址应该看起来像一个有效的 email 地址。用 HTML 表示，表单看起来可能有点像：</p>
+
+<pre>
+&lt;form action=&quot;formpage.php&quot; method=&quot;post&quot;&gt;
+  &lt;b&gt;First Name:&lt;/b&gt; &lt;input type=&quot;text&quot; name=&quot;fname&quot; value=&quot;&quot;&gt;&lt;br&gt;
+  &lt;b&gt;Last Name:&lt;/b&gt; &lt;input type=&quot;text&quot; name=&quot;lname&quot; value=&quot;&quot;&gt;&lt;br&gt;
+  &lt;b&gt;Email:&lt;/b&gt; &lt;input type=&quot;text&quot; name=&quot;email&quot; value=&quot;&quot;&gt;&lt;br&gt;
+  &lt;input type=&quot;submit&quot; value=&quot;Submit&quot;&gt;
+&lt;/form&gt;
+</pre>
+
+<p class="docText">增加一些 CSS 样式，可以渲染成下图这个样子：</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch12sec03No.01.gif" /></center></p>
+
+<p class="docText">为了建立统一的 API，我们创建一个 <tt>Widget</tt> 基类(如果这是一个 PHP5 例子，这或许会是一个接口)。既然所有部件(表单元素)都必须至少渲染一些输出，<tt>Widget</tt> 只有一个 <tt>paint()</tt> 方法。</p>
+
+<pre>
+class Widget {
+  function paint() {
+    return $this-&gt;_asHtml();
+ }
+}
+</pre>
+
+<p class="docText">让我们从一个基本的文本输入部件开始。它必须包含输入域的名字、输入域的值，而且必须能够渲染为 HTML。</p>
+
+<pre>
+class TextInput extends Widget {
+  var $name;
+  var $value;
+
+  function TextInput($name, $value = '') {
+    $this-&gt;name = $name;
+    $this-&gt;value = $value;
+  }
+
+  function _asHtml() {
+    return '&lt;input type=&quot;text&quot; name=&quot;'.$this-&gt;name.'&quot; value=&quot;'
+      .$this-&gt;value.'&quot;&gt;';
+  }
+}
+</pre>
+
+<p class="docText">一个基本的测试可以验证 HTML 是否正确，以及作为参数传递到构造函数的名字和值是否也被带到了渲染后的输出中：</p>
+
+<pre>
+class WidgetTestCase extends UnitTestCase {
+  function testTextInput() {
+    $text =&amp; new TextInput('foo', 'bar');
+
+    $output = $text-&gt;paint();
+
+    $this-&gt;assertWantedPattern('~^&lt;input type=&quot;text&quot;[^&gt;]*&gt;$~i',
+                               $output);
+    $this-&gt;assertWantedPattern('~name=&quot;foo&quot;~i', $output);
+    $this-&gt;assertWantedPattern('~value=&quot;bar&quot;~i', $output);
+  }
+}
+</pre>
+
+<p class="docText"><tt>TextInput</tt> 部件工作正常，但它的用户接口十分糟糕，因为它缺乏象“<tt>First Name</tt>”或“<tt>Email Address</tt>”那样的友好的描述。因此，下一个要加入的 <tt>Widget</tt> 的合理特性就是描述。现在，我们开始进入 Decorator 模式，它能够统一地将一个功能添加到所有的 <tt>Widget</tt>。</p>
+
+<p class="docText">开始，我们创建一个通用的 <tt>WidgetDecorator</tt> 类，它可以被扩展来生成特定的具体 Decorator。最低限度，<tt>WidgetDecorator</tt> 类必须在它的构造函数中接受一个 <tt>Widget</tt> 并复制 <tt>public paint()</tt> 方法。</p>
+
+<pre>
+class WidgetDecorator {
+  var $widget;
+  
+  function WidgetDecorator(&amp;$widget) {
+    $this-&gt;widget =&amp; $widget;
+  }
+  
+  function paint() {
+    return $this-&gt;widget-&gt;paint();
+  }
+}
+</pre>
+
+<p class="docText">为了建立一个标签，需要传递标签的内容，以及原始的部件：</p>
+
+<pre>
+class Labeled extends WidgetDecorator {
+  var $label;
+  
+  function Labeled($label, &amp;$widget) {
+    $this-&gt;label = $label;
+    $this-&gt;WidgetDecorator($widget);
+  }
+}
+</pre>
+
+<p class="docText"><tt>Labeled</tt> 还需要拦截 <tt>paint()</tt> 调用，并把标签信息增加到输出中：</p>
+
+<pre>
+class Labeled extends WidgetDecorator {
+  var $label;
+  
+  function Labeled($label, &amp;$widget) {
+    $this-&gt;label = $label;
+    $this-&gt;WidgetDecorator($widget);
+  }
+  
+  <span class="docEmphStrong">function paint() {
+    return '&lt;b&gt;'.$this-&gt;label.':&lt;/b&gt; '
+      .$this-&gt;widget-&gt;paint();
+  }</span>
+}
+</pre>
+
+<p class="docText">用下面的测试可以验证这个类是否可以正常工作：</p>
+
+<pre>
+class WidgetTestCase extends UnitTestCase {
+  function testLabeled() {
+    $text =&amp; new Labeled('Email', new TextInput('email'));
+
+    $output = $text-&gt;paint();
+    
+    $this-&gt;assertWantedPattern('~^&lt;b&gt;Email:&lt;/b&gt; &lt;input~i',
+                               $output);
+  }
+}
+</pre>
+
+<p class="docText">有了 <tt>TextInput</tt> 和 <tt>Labele</tt> 的基本功能，你就能够着手编写一个类来集中管理表单了。</p>
+
+<p class="docText"><tt>FormHandler</tt> 包含一个静态 <tt>build()</tt> 方法，用于创建一个 <tt>Widget</tt> 表单元素数组：</p>
+
+<pre>
+class FormHandlerTestCase extends UnitTestCase {
+  function testBuild() {
+    $this-&gt;assertIsA($form = FormHandler::build(new Post), 'Array');
+    $this-&gt;assertEqual(3, count($form));
+    $this-&gt;assertIsA($form[1], 'Labeled');
+    $this-&gt;assertWantedPattern('~email~i', $form[2]-&gt;paint());
+  }
+}
+</pre>
+
+<p class="docText">实现 <tt>FormHandler</tt> 的代码如下：</p>
+
+<pre>
+class FormHandler {
+  function build() {
+    return array (
+      new Labeled('First Name', new TextInput('fname')),
+      new Labeled('Last Name', new TextInput('lname')),
+      new Labeled('Email', new TextInput('email'))
+    );
+  }
+}
+</pre>
+
+<p class="docText">现在，由于没有相应的 <tt>$_POST</tt> 值，这段代码并不能带给你什么好处。因为这段代码必须用一个 MockObject(见第 6 章) 来测试，因此我们把 <tt>$_POST</tt> 值包装在一个类似 Registry(见第 5 章) 的类哈希对象或 Specification 模式(见第 10 章) 所介绍的模拟 WACT <tt>DataSource</tt> 中：</p>
+
+<pre>
+class Post {
+  var $store = array();
+  
+  function get($key) {
+    if (array_key_exists($key, $this-&gt;store)) {
+      return $this-&gt;store[$key];
+    }
+  }
+  
+  function set($key, $val) {
+    $this-&gt;store[$key] = $val;
+  }
+}
+</pre>
+
+<p class="docText">可以用一个方便的方法来充当一个 Factory，并使用来自 <tt>$_POST</tt> 的键自动填充哈希对象。</p>
+
+<pre>
+class Post {
+  // ...
+  
+  <span class="docEmphStrong">function &amp;autoFill() {
+    $ret =&amp; new Post;
+    foreach ($_POST as $key =&gt; $value) {
+      $ret-&gt;set($key, $value);
+    }
+    return $ret;
+  }</span>
+}
+</pre>
+
+<p class="docText">利用这个 <tt>Post</tt> 类，你可以修改 <tt>FormHandler::build()</tt>，默认情况下使用已有的 <tt>$_POST</tt> 数据：</p>
+
+<pre>
+class FormHandler {
+  function build(&amp;$post) {
+    return array(
+      new Labeled('First Name', new TextInput('fname', $post-&gt;get('fname'))),
+      new Labeled('Last Name', new TextInput('lname', $post-&gt;get('lname'))),
+      new Labeled('Email',new TextInput('email', $post-&gt;get('email')))
+    );
+  }
+}
+</pre>
+
+<p class="docText">现在，你可以建立一个 PHP 脚本，使用这个 <tt>FormHandler</tt> 来生成 HTML 表单：</p>
+
+<pre>
+&lt;form action=&quot;formpage.php&quot; method=&quot;post&quot;&gt;
+  &lt;?php
+    $post =&amp; Post::autoFill();
+    $form = FormHandler::build($post);
+
+    foreach ($form as $widget) {
+      echo $widget-&gt;paint(), &quot;&lt;br&gt;\n&quot;;
+    }
+
+  ?&gt;
+  &lt;input type=&quot;submit&quot; value=&quot;Submit&quot;&gt;
+&lt;form&gt;
+</pre>
+
+<p class="docText">现在，你已经有了一个提交到它自己，并能保持提交数据的表单处理器。</p>
+
+<p class="docText">我们继续为表单添加一些验证。方法是另外编写一个 <tt>Widget</tt> Decorator 来代表一个“无效”的状态，并扩展 <tt>FormHandler</tt> 类，增加一个 <tt>validate()</tt> 方法来处理 <tt>Widget</tt> 实例数组。如果一个 <tt>Widget</tt> 是“无效的”，我们通过把它包装在一个带有“<tt>invalid</tt>”class 属性的 <tt>&lt;span&gt;</tt> 标签中，从而把它独立出来。下面就是一个用于说明这个目的的测试：</p>
+
+<pre>
+class WidgetTestCase extends UnitTestCase {
+  // ...
+  
+  function testInvalid() {
+    $text =&amp; new Invalid(new TextInput('email'));
+
+    $output = $text-&gt;paint();
+    
+    $this-&gt;assertWantedPattern(
+      '~^&lt;span class=&quot;invalid&quot;&gt;&lt;input[^&gt;]+&gt;&lt;/span&gt;$~i',
+      $output
+    );
+  }
+}
+</pre>
+
+<p class="docText">下面是 <tt>WidgetDecorator</tt> 子类，<tt>Invalid</tt>：</p>
+
+<pre>
+class Invalid extends WidgetDecorator {
+  function paint() {
+    return '&lt;span class=&quot;invalid&quot;&gt;'
+      .$this-&gt;widget-&gt;paint().'&lt;/span&gt;';
+  }
+}
+</pre>
+
+<p class="docText">Decorator 很好的一点就是你可以把它们串在一起。<tt>Invalid</tt> Decorator 只知道它正在封装一个部件：它并不关心这个部件是一个 <tt>TextInput</tt>、<tt>Select</tt>，还是一个任何 <tt>Widget</tt> 的 <tt>Labeled</tt> 版本。</p>
+
+<p class="docText">这导致了下一个合理的测试用例：</p>
+
+<pre>
+class WidgetTestCase extends UnitTestCase {
+  // ...
+  
+  function testInvalidLabeled() {
+    $text =&amp; new Invalid(new Labeled('Email', new TextInput('email')));
+    $output = $text-&gt;paint();
+    
+    $this-&gt;assertWantedPattern('~&lt;b&gt;Email:&lt;/b&gt; &lt;input~i',
+                               $output);
+    $this-&gt;assertWantedPattern(
+      '~^&lt;span class=&quot;invalid&quot;&gt;.*&lt;/span&gt;$~i',
+      $output
+    );
+  }
+}
+</pre>
+
+<p class="docText">有了 <tt>Invalid</tt> Decorator 在手，我们着手解决 <tt>FormHandler::validate()</tt> 方法：</p>
+
+<pre>
+class FormHandlerTestCase extends UnitTestCase {
+  // ...
+  
+  function testValidateMissingName() {
+    $post =&amp; new Post;
+    $post-&gt;set('fname', 'Jason');
+    $post-&gt;set('email', 'jsweat_php@yahoo.com');
+    
+    $form = FormHandler::build($post);    
+    $this-&gt;assertFalse(FormHandler::validate($form, $post));
+
+    $this-&gt;assertNoUnwantedPattern('/invalid/i', $form[0]-&gt;paint());
+    <span class="docEmphStrong">$this-&gt;assertWantedPattern('/invalid/i', $form[1]-&gt;paint());</span>
+    $this-&gt;assertNoUnwantedPattern('/invalid/i', $form[2]-&gt;paint());
+  }
+}
+</pre>
+
+<p class="docText">这个测试涵盖了所有的要素：建立一个 <tt>Post</tt> 实例，用它来建立一个 <tt>Widget</tt> 集合，然后把集合传递给验证方法。</p>
+
+<pre>
+class FormHandler {
+  function validate(&amp;$form, &amp;$post) {
+    // first name required
+    if (!strlen($post-&gt;get('fname'))) {
+      $form[0] =&amp; new Invalid($form[0]);
+    }
+    
+    // last name required
+    if (!strlen($post-&gt;get('lname'))) {
+      $form[1] =&amp; new Invalid($form[1]);
+    }
+  }
+}
+</pre>
+
+<div class="docNote">
+
+<p class="docNoteTitle">Ugly Code(丑陋的代码)</p>
+
+<p class="docNoteText">当我查看这段代码的时候，我发现了两个“丑陋”的地方：一个是用数字索引访问表单元素，另一个是必须传递 <tt>$_POST</tt> 数组给验证方法。在以后的重构过程中，用一个以表单元素索引的联合数组作 <tt>Widget</tt> 集合可能会更好一点。或许用一个 Registry 甚至会更加合理。你也可以给 <tt>Widget</tt> 类增加一个方法来返回它的当前值，从而避免传递 <tt>$_POST</tt> 实例给 <tt>Widget</tt> 集合的构造函数。不过，所有这些都超出了这个例子的目的范围。</p>
+
+</div>
+
+<p class="docText">验证完 <tt>name</tt>，我们继续增加一个简单的正则表达式来验证 <tt>email</tt> 地址：</p>
+
+<pre>
+class FormHandlerTestCase extends UnitTestCase {
+  // ...
+  
+  function testValidateBadEmail() {
+    $post =&amp; new Post;
+    $post-&gt;set('fname', 'Jason');
+    $post-&gt;set('lname', 'Sweat');
+    $post-&gt;set('email', 'jsweat_php AT yahoo DOT com');
+    
+    $form = FormHandler::build($post);    
+    $this-&gt;assertFalse(FormHandler::validate($form, $post));
+
+    $this-&gt;assertNoUnwantedPattern('/invalid/i', $form[0]-&gt;paint());
+    $this-&gt;assertNoUnwantedPattern('/invalid/i', $form[1]-&gt;paint());
+    $this-&gt;assertWantedPattern('/invalid/i', $form[2]-&gt;paint());
+  }
+}
+</pre>
+
+<p class="docText">实现这个简单的 <tt>email</tt> 验证的代码如下：</p>
+
+<pre>
+class FormHandler {
+  function validate(&amp;$form, &amp;$post) {
+    // first name required
+    if (!strlen($post-&gt;get('fname'))) {
+      $form[0] =&amp; new Invalid($form[0]);
+    }
+    
+    // last name required
+    if (!strlen($post-&gt;get('lname'))) {
+      $form[1] =&amp; new Invalid($form[1]);
+    }
+    
+    // email has to look real
+    <span class="docEmphStrong">if (!preg_match('~\w+@(\w+\.)+\w+~', $post-&gt;get('email'))) {
+      $form[2] =&amp; new Invalid($form[2]);
+    }</span>
+  }
+}
+</pre>
+
+<p class="docText">你也可以创建一个测试用例来验证表单何时有效：</p>
+
+<pre>
+class FormHandlerTestCase extends UnitTestCase {
+  // ...
+  
+  function testValidate() {
+    $post =&amp; new Post;
+    $post-&gt;set('fname', 'Jason');
+    $post-&gt;set('lname', 'Sweat');
+    $post-&gt;set('email', 'jsweat_php@yahoo.com');
+    
+    $form = FormHandler::build($post);    
+    $this-&gt;assertTrue(FormHandler::validate($form, $post));
+
+    $this-&gt;assertNoUnwantedPattern('/invalid/i', $form[0]-&gt;paint());
+    $this-&gt;assertNoUnwantedPattern('/invalid/i', $form[1]-&gt;paint());
+    $this-&gt;assertNoUnwantedPattern('/invalid/i', $form[2]-&gt;paint());
+  }
+}
+</pre>
+
+<p class="docText">下面的测试在方法中创建了跟踪任何验证失败的需求，所以如果一切正常的话，它可以返回 <tt>true</tt>。</p>
+
+<pre>
+class FormHandler {
+  // ...
+  
+  function validate(&amp;$form, &amp;$post) {
+    <span class="docEmphStrong">$valid = true;</span>
+    
+    // first name required
+    if (!strlen($post-&gt;get('fname'))) {
+      $form[0] =&amp; new Invalid($form[0]);
+      <span class="docEmphStrong">$valid = false;</span>
+    }
+    
+    // last name required
+    if (!strlen($post-&gt;get('lname'))) {
+      $form[1] =&amp; new Invalid($form[1]);
+      <span class="docEmphStrong">$valid = false;</span>
+    }
+    
+    // email has to look real
+    if (!preg_match('~\w+@(\w+\.)+\w+~',
+                    $post-&gt;get('email'))) {
+      $form[2] =&amp; new Invalid($form[2]);
+      <span class="docEmphStrong">$valid = false;</span>
+    }
+    
+    <span class="docEmphStrong">return $valid;</span>
+  }
+}
+</pre>
+
+<p class="docText">这些就是为页面添加验证所需的所有代码块了。下面是一个最终的屏幕截图。</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch12sec03No.10.gif" /></center></p>
+
+<p class="docText">以及生成这个截图的页面：</p>
+
+<pre>
+&lt;html&gt;
+  &lt;head&gt;
+    &lt;title&gt;Decorator Example&lt;/title&gt;
+    &lt;style type=&quot;text/css&quot;&gt;
+      .invalid { color: red; }
+      .invalid input { background-color: red; color: yellow; }
+      #myform input { position: absolute; left: 110px; width: 250px; font-weight: bold;}
+    &lt;/style&gt;
+  &lt;/head&gt;
+  
+  &lt;body&gt;
+    &lt;form action=&quot;&lt;?php echo $_SERVER['PHP_SELF']; ?&gt;&quot; method=&quot;post&quot;&gt;
+      &lt;div id=&quot;myform&quot;&gt;
+        &lt;?php
+          error_reporting(E_ALL);
+          require_once 'widgets.inc.php';
+
+          $post =&amp; Post::autoFill();
+          $form = FormHandler::build($post);
+          if ($_POST) {
+            FormHandler::validate($form, $post);
+          }
+
+          foreach ($form as $widget) {
+            echo $widget-&gt;paint(), &quot;&lt;br&gt;\n&quot;;
+          }
+        ?&gt;
+      &lt;/div&gt;
+      &lt;input type=&quot;submit&quot; value=&quot;Submit&quot;&gt;
+    &lt;/form&gt;
+  &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+
+<h3 class="docSection1Title">小结</h3>
+
+<p class="docText">Decorator 是另一个你使用片刻后就会爱上它们的设计模式之一。Decorator 模式让你很容易就可以绕过严格的继承问题。当需要在运行时有效改变一个对象的类时，你就可以考虑使用 Decorator。或在遍及你的脚本的不同场合中使用对象时，或许甚至可以考虑多次用它。</p>
+
+<p class="docText">或许，Decorator 模式最重要的方面还是它的“胜过”继承的能力。本章“问题”部分展示了一个使用继承引起的子类爆炸。使用基于 Decorator 的解决方案，现在的 UML 类图就像下面这个图显示的那样，是一个更加简洁灵活的解决方案。如下图所示：</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch12sec04No.01.gif" /></center></p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

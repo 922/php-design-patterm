@@ -1,0 +1,587 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第十章 The Specification Pattern —— 规范模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第十章 The Specification Pattern —— 规范模式</h2>
+
+<p class="docText">随着应用程序成型，一些业务逻辑不受控制地到处滋生。一个对象必须基于价格限制项目；另一个对象必须为销售税选择正确的利率；而其它的则必须决定是否将任何特定条件应用于当前订单。有些业务规则比较简单，只需要很少的，不超过一两个逻辑比较，而有的规则可能需要冗长的计算指令，需要数据库查询以及用户输入作指导。</p>
+
+<p class="docText">编写代码将抽象(一种业务规则)转变成了某种具体的概念。但抽象(如购物方式、税率和运费计算)也会进化和增加，这样的变化很容易就会难倒一个倒霉的开发者。为了保证安全 —— 如你目前在本书所见到的 —— 尽可能封装和隔离那些容易变化的代码是非常理想的。而且，这也的确是一个明智的应对业务规则的策略。</p>
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">有没有一种明确的方法可以用来封装业务逻辑？有没有一种技术可以使改写和重用更加简单？</p>
+
+
+<h3 class="docSection1Title">解决方案</h3>
+
+<p class="docText">Specification 模式就是设计来进行验证(validate)和选择(select)的。</p>
+
+<ul class="docList">
+
+<li><p class="docText">验证(Validation)就是判断一个特定的对象是否满足一个确定的标准。</p></li>
+
+<li><p class="docText">选择(Selection)就是识别一个集合中满足给定标准的那些元素。</p></li>
+
+</ul>
+
+<p class="docText">Specification 模式允许你组织这些标准，以便可以在你的程序中灵活使用它们。</p>
+
+<p class="docText">重构鼓励你在方法中捕捉决策，以促进代码的透明性和重用。通过把这个结构系统化为单独的对象，然后插回你的应用程序的合适的地方，Specification 模式更进了一步。大多数情况下，Specification 对象都是参数化的，而且经常被组合在一起来方便地建立你应用领域中的复杂的逻辑表达式。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">Additional Reading(补充阅读)</p>
+
+<p class="docNoteText">Eric Evans 和 Martin Fowler 合写了一篇关于 Specification 模式的文章，可以在 <a class="docLink" target="_blank" href="http://www.martinfowler.com/apsupp/spec.pdf">http://www.martinfowler.com/apsupp/spec.pdf</a> 找到。另外，Eric Evans 在他的《领域驱动设计》(<span class="docEmphasis">Domain Driven Design</span>)一书的 224 页和 273 页也对这个模式进行了详细地介绍。</p>
+
+</div>
+
+<p class="docText">为了合理介绍这个模式，本章组织为三个逻辑步骤。 首先，通过一个“纯粹的”例子，说明了应用到一个对象时这个模式的基本概念。(Evans 和 Fowler 称之为“硬式编码规范(Hard Coded Specification)”)。下一步演示了如何建立一个参数化规范，它为 Specification 模式提供了一个更加动态灵活的框架(因此被称为“参数化规范(Parameterized Specification)”)。最后，开发一个“策略工厂(Policy Factory)”，把大量的 Specification 对象一起汇编成一个易于使用的包(“复合规范(Composite Sepecification)”)。</p>
+
+
+<h4 class="docSection2Title">到暖和的地方去旅行</h4>
+
+<p class="docText">最近，我和我的家人计划去度假，然后，我的妻子想去“暖和一点的地方”。尽管有无数的与旅行相关的站点，但是，在我们访问过的站点中，没有一个提供了每个目的地的温度。没办法了，我们不得不不断地转换到 weather.com 进行查询，这非常不便。现在，就让我们来改变这种状况，为一个假想的旅行站点增加一个温度查询功能。我们以 Specification 模式为向导，向你展示如何编写代码来比较游客所期望的最低温度和若干目的地的平均温度。</p>
+
+<p class="docText">首先，我们创建一些非常简单的领域对象。第一个是 <tt>Traveler</tt>，用于存储首选的最低温度。</p>
+
+<pre>
+// PHP5
+class Traveler {
+  public $min_temp;
+}
+</pre>
+
+<p class="docText">接下来，我们创建一个类来代表目的地。由于平均温度是一个关键标准，<tt>Destination</tt> 的构造函数应该得到一个包含十二个值的数组，每个值对应当年每个月的平均温度。</p>
+
+<pre>
+class Destination {
+  protected $avg_temps;
+
+  public function __construct($avg_temps) {
+    $this-&gt;avg_temps = $avg_temps;
+  }
+}
+</pre>
+
+<p class="docText"><tt>Destination</tt> 还需要一个为任何给定月份取回目的地平均温度的方法：</p>
+
+<pre>
+class Destination {
+  //...
+<span class="docEmphStrong">
+  public function getAvgTempByMonth($month) {
+    $key = (int)$month - 1;
+
+    if (array_key_exists($key, $this-&gt;avg_temps)) {
+      return $this-&gt;avg_temps[$key];
+    }
+  }</span>
+}
+</pre>
+
+<p class="docText">最后，<tt>Trip</tt> 类组合了一个 <tt>Traveler</tt>、一个 <tt>Destination</tt> 以及一个日期。</p>
+
+<pre>
+class Trip {
+  public $date;
+  public $traveler;
+  public $destination;
+}
+</pre>
+
+<p class="docText">有了这些对象，你就可以通过 <tt>Trip::date</tt> 取得旅行的月份，并比较那个月 <tt>Destination</tt> 的平均温度和 <tt>Traveler</tt> 期望的最低温度。(这个比较可能并不十分复杂，但还是要你自己去实现)</p>
+
+<p class="docText">我们来看看如何用 Specification 模式实现“暖和目的地”的业务逻辑，并观察如何用这个模式来验证目的地和挑选所有合适的目的地。</p>
+
+
+<h3 class="docSection1Title">范例代码</h3>
+
+<p class="docText">Specification 模式的核心是一个对象，这个对象有一个 <tt>IsSatisfiedBy()</tt> 方法，该方法接受一个参数，基于 Specification 的标准计算并返回一个布尔值。</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch10sec03No.01.gif" /></center></p>
+
+<p class="docText">“目的地足够暖和”标准如下：</p>
+
+<pre>
+class TripRequiredTemperatureSpecification {
+  public function isSatisfiedBy($trip) {
+    $trip_temp = $trip-&gt;destination-&gt;getAvgTempByMonth(date('m', $trip-&gt;date));
+    return ($trip_temp &gt;= $trip-&gt;traveler-&gt;min_temp);
+  }
+}
+</pre>
+
+<p class="docText">下面是一些用来验证 Specification 如何工作的测试。</p>
+
+<p class="docText">最初的单元测试用例提供了一些 <tt>Destination</tt> 来操作：</p>
+
+<pre>
+class TripSpecificationTestCase extends UnitTestCase {
+  protected $destinations = array();
+
+  function setup() {
+    $this-&gt;destinations = array(
+      'Toronto' =&gt; new Destination(
+        array(24, 25, 33, 43, 54, 63, 69, 69, 61, 50, 41, 29)),
+      'Cancun' =&gt; new Destination(
+        array(74, 75, 78, 80, 82, 84, 84, 84, 83, 81, 78, 76))
+    );
+  }
+}
+</pre>
+
+<p class="docText">(回想一下，在创建 <tt>Destination</tt> 时，需要传递一个每月平均温度数组给每个实例。身为一个美国作者，在这个例子中我选择使用华氏温度。对应的，Vicki 所期望的 70 华氏度就等于 21 摄氏度。)</p>
+
+<p class="docText">下一个测试创建了一个 <tt>Traveler</tt>，并设置了它的首选最低温度和出游时间，然后还选择了一个目的地。第一个组合，“<span class="docEmphasis">多伦多(Toronto)，二月中旬，70 度</span>”，应该如预期那样，不能通过：</p>
+
+<pre>
+class TripSpecificationTestCase extends UnitTestCase {
+  // ...
+
+  function TestTripTooCold() {
+    $vicki = new Traveler;
+    $vicki-&gt;min_temp = 70;
+
+    $toronto = $this-&gt;destinations['Toronto'];
+
+    $trip = new Trip;
+    $trip-&gt;traveler = $vicki;
+    $trip-&gt;destination = $toronto;
+    $trip-&gt;date = mktime(0, 0, 0, 2, 11, 2005);
+
+    <span class="docEmphStrong">$warm_enough_check = new TripRequiredTemperatureSpecification;
+    $this-&gt;assertFalse($warm_enough_check-&gt;isSatisfiedBy($trip));</span>
+  }
+}
+</pre>
+
+<p class="docText">但是，接下来的组合，“<span class="docEmphasis">Cancun，二月中旬，至少 70 度</span>”，如预期那样通过：</p>
+
+<pre>
+class TripSpecificationTestCase extends UnitTestCase {
+  // ...
+
+  function TestTripWarmEnough() {
+    $vicki = new Traveler;
+    $vicki-&gt;min_temp = 70;
+
+    $cancun = $this-&gt;destinations['Cancun'];
+
+    $trip = new Trip;
+    $trip-&gt;traveler = $vicki;
+    $trip-&gt;destination = $cancun;
+    $trip-&gt;date = mktime(0,0,0,2,11,2005);
+
+    <span class="docEmphStrong">$warm_enough_check = new TripRequiredTemperatureSpecification;
+    $this-&gt;assertTrue($warm_enough_check-&gt;isSatisfiedBy($trip));</span>
+  }
+}
+</pre>
+
+<h4 class="docSection2Title">Parameterized Specification(参数化规范)</h4>
+
+<p class="docText"><tt>TripRequiredTemperatureSpecification</tt> 知道 <tt>Trip</tt> 对象结构的一些细节，了解所有三个 <tt>public</tt> 属性。这就本身而言并不是很糟糕；事实上，当使用 Specification 模式的时候，我发现，经常有一些 Specification 受益于这种对具体预期参数对象的详细了解。然而，这种亲密联系使得在其它环境中重用 Specification 非常困难。</p>
+
+<p class="docText">幸运的是，重用问题已经在各种 Specification 模式中被解决了。特别地，Parameterized Specification 模式改变了构造函数，接受一个参数(这个名字由此而来)，该参数然后被用在 <tt>isSatisfiedBy()</tt> 的条件求值中。</p>
+
+<p class="docText">我们来看一个 Parameterized Specification，它使用相同的旅行站点领域对象。假设你想搜索一个目的地列表，并显示一个符合“足够暖和”条件的城市列表。</p>
+
+<p class="docText">为了利用现有的 <tt>TripRequiredTemperatureSpecification</tt>，必须为每个求值操作创建一个 <tt>Trip</tt> 对象。但是因为(在这个具体问题中) <tt>Traveler</tt> 和旅行日期是不变的，当你遍历可能的目的地列表的时候，只有 <tt>Destination</tt> 需要改变。使用 Parameterized Specification，你只需要记住游客的首选温度和出游日期，然后与作为参数传递到 <tt>isSatisfiedBy()</tt> 方法的 <tt>Destination</tt> 进行比较。</p>
+
+<p class="docText">Parameterized Specification 对象 <tt>DestinationRequiredTemperatureSpecification</tt> 的构造函数需要一个 <tt>Traveler</tt> 和日期来实例化这个 Specification：</p>
+
+<pre>
+class DestinationRequiredTemperatureSpecification {
+  protected $temp;
+  protected $month;
+
+  public function __construct($traveler, $date) {
+    $this-&gt;temp = $traveler-&gt;min_temp;
+    $this-&gt;month = date('m', $date);
+  }
+}
+</pre>
+
+<p class="docText">使用存储在实例变量中的一致的温度和日期数据，<tt>DestinationRequiredTemperatureSpecification</tt> 的 <tt>isSatisfiedBy()</tt> 方法接受一个 <tt>Destination</tt> 作为参数，并求判别式的值：</p>
+
+<pre>
+class DestinationRequiredTemperatureSpecification {
+  // ...
+
+  <span class="docEmphStrong">function isSatisfiedBy($destination) {
+    return ($destination-&gt;getAvgTempByMonth($this-&gt;month) &gt;= $this-&gt;temp);
+  }</span>
+}
+</pre>
+
+<p class="docText">现在，你可以编写一个测试用例来过滤目的地列表：</p>
+
+<pre>
+class DestinationSpecificationTestCase extends UnitTestCase {
+  // similar setup to TripSpecificationTestCase
+  function TestFindingDestinations() {
+    $this-&gt;assertEqual(2, count($this-&gt;destinations));
+
+    $valid_destinations = array();
+
+    $vicki = new Traveler;
+    $vicki-&gt;min_temp = 70;
+
+    $travel_date = mktime(0,0,0,2,11,2005);
+
+    <span class="docEmphStrong">$warm_enough = new DestinationRequiredTemperatureSpecification(vicki, $travel_date);
+    foreach ($this-&gt;destinations as $dest) {
+      if ($warm_enough-&gt;isSatisfiedBy($dest)) {
+        $valid_destinations[] = $dest;
+      }
+    }</span>
+
+    $this-&gt;assertEqual(1, count($valid_destinations));
+    $this-&gt;assertIdentical($this-&gt;destinations['Cancun'],
+                           $valid_destinations[0]);
+  }
+}
+</pre>
+
+<p class="docText">通过这个例子，你可以看到 Parameterized Specification 给你带来了更多的自由度和灵活性。</p>
+
+<p class="docText">我们再来看另一个例子，在这个例子中，数据类型和 Specification 都非常灵活。</p>
+
+<p class="docText">在 web 应用程序中，需要解决的最普遍和最令人疯狂的问题之一就是验证表单输入。在开发过程中(甚至之前)，表单往往会发生改变，而且在一个大型应用程序中，表单的数量会快速增长。你可以创建一个唯一的对象来封装每一个表单，然后使用 Specification 模式来验证每个对象，但这绝对是一场维护噩梦。</p>
+
+<p class="docText">有没有一种方便的，适用于任何表单的数据类型？如果有，那么有没有一种验证这种动态数据类型的方法？</p>
+
+<p class="docText">对这些问题的每一个的回答都是肯定的。</p>
+
+<p class="docText">Web 应用程序组件工具(WACT)的 <tt>DataSource</tt> 接口可以获取、设置并动态创建对象属性(有点像 PHP4 的 <tt>__get()</tt> 和 <tt>__set()</tt> 方法)，它是一个方便的表单封装。(熟悉 Java 的读者可以把 <tt>DataSource</tt> 看作 HashMap)同时，Parameterized Specification 模式提供了一种模型以一系列标准来验证 <tt>DataSource</tt>。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">WACT</p>
+
+<p class="docNoteText">WACT(Web Application Component Toolkit，Web 应用程序组件工具包)，是一个用于解决通用 web 应用问题的 PHP 代码库，可以在 SourceForge 的 <a class="docLink" target="_blank" href="http://wact.sf.net/">http://wact.sf.net/</a> 找到。WACT 注重重构技术，单元测试，以及设计模式的使用。在 <a class="docLink" target="_blank" href="http://wact.sf.net/index.php/DataSource">http://wact.sf.net/index.php/DataSource</a> 有与 WACT DataSource 概念相关的信息。在你下载的本书的源代码中已经包含了 WACT DataSource 类的包含文件，这样你就能够测试策略代码了。</p>
+
+</div>
+
+<p class="docText">在这个例子中，<tt>DataSource</tt> 类可以想象成如下面的代码所示，它与在第 5 章开发的 Registry 类几乎是一样的：</p>
+
+<pre>
+class DataSource {
+  protected $store = array();
+
+  function get($key) {
+    if (array_key_exists($key, $this-&gt;store)) {
+      return $this-&gt;store[$key];
+    }
+  }
+
+  function set($key, $val) {
+    $this-&gt;store[$key] = $val;
+  }
+}
+</pre>
+
+<p class="docText"><tt>DataSource</tt> 使用字符串标识符间接访问对象属性。<tt>set()</tt> 用于修改现有的属性或动态创建新的属性；<tt>get()</tt> 则返回指定名称的属性。</p>
+
+<p class="docText">当你的应用程序必须处理一个表单的时候，你可以把 <tt>$_POST</tt> 值装载到 <tt>DataSource</tt>，然后使用 Parameterized Specification 来执行验证。(相同的技术也可用于配置文件。从配置文件加载 <tt>DataSource</tt>，然后用 Specifications 验证它。)</p>
+
+<p class="docText">我们创建一些简单的 Parameterized Specification 类来当作创建代码块使用。首先，我们创建一个 Specification，如果某个字段等于一个特定值，则可以通过。</p>
+
+<pre>
+class FieldEqualSpecification {
+  protected $field;
+  protected $value;
+
+  public function __construct($field, $value) {
+    $this-&gt;field = $field;
+    $this-&gt;value = $value;
+  }
+
+  public function isSatisfiedBy($datasource) {
+    <span class="docEmphStrong">return ($datasource-&gt;get($this-&gt;field) == $this-&gt;value);</span>
+  }
+}
+</pre>
+
+<p class="docText">这个想法很简单：在构造期间存储一个字段和它期望的值，从 <tt>DataSource</tt> 取出期望的字段传递给 <tt>isSatisfiedBy()</tt>，然后与预期的值进行比较。</p>
+
+<p class="docText">为了测试这个 Specification，编写一个测试用例来实例化一个 <tt>DataSource</tt>：</p>
+
+<pre>
+class SpecificationsTestCase extends UnitTestCase {
+  protected $ds;
+
+  function setup() {
+    $this-&gt;ds = new DataSource;
+    $this-&gt;ds-&gt;set('name', 'Jason');
+    $this-&gt;ds-&gt;set('age', 34);
+    $this-&gt;ds-&gt;set('email', 'jsweat_php@yahoo.com');
+    $this-&gt;ds-&gt;set('sex', 'male');
+  }
+}
+</pre>
+
+<p class="docText">上面，<tt>setup()</tt> 使用一系列已知的属性创建了一个 <tt>DataSource</tt> 对象。这个测试方法还包含一个应该通过的断言和另一个应该失败的断言。</p>
+
+<pre>
+class SpecificationsTestCase extends UnitTestCase {
+  // ...
+
+  function TestFieldEqualSpecification() {
+    $name_jason = new FieldEqualSpecification('name', 'Jason');
+    $this-&gt;assertTrue($name_jason-&gt;isSatisfiedBy($this-&gt;ds));
+
+    $sex_other = new FieldEqualSpecification('sex', 'other');
+    $this-&gt;assertFalse($sex_other-&gt;isSatisfiedBy($this-&gt;ds));
+  }
+}
+</pre>
+
+<p class="docText">通常，在比较字符串的时候，正则表达式可以帮助你定义要查找的内容，比一系列精确比较要好得多。于是，我们为 <tt>FieldMatchSpecification</tt> 增加正则表达式功能来匹配我们的 Specification 工具集：</p>
+
+<pre>
+class FieldMatchSpecification {
+  protected $field;
+  protected $regex;
+
+  public function __construct($field, $regex) {
+    $this-&gt;field = $field;
+    $this-&gt;regex = $regex;
+  }
+
+  public function isSatisfiedBy($datasource) {
+    return preg_match($this-&gt;regex, $datasource-&gt;get($this-&gt;field));
+  }
+}
+</pre>
+
+<p class="docText">在这个例子中，用于计算的字段名和 PCRE 表达式是在构造期间被保存的。然后 <tt>isSatisfiedBy()</tt> 从传递过来的 <tt>DataSource</tt> 取得这个字段，并使用 <tt>preg_match()</tt> 与正则表达式比较它的值。</p>
+
+<p class="docText">下面就是如何为 <tt>FieldMatchSpecification</tt> 编写一个测试：</p>
+
+<pre>
+class SpecificationsTestCase extends UnitTestCase {
+  // ...
+
+  function TestFieldMatchSpecification() {
+    $valid_email = new FieldMatchSpecification(
+      'email',
+      '/^[^\s@]+@[^\s.]+(?:\.[^\s.]+)+/'
+    );
+    $this-&gt;assertTrue($valid_email-&gt;isSatisfiedBy($this-&gt;ds));
+
+    $name_ten_letters = new FieldMatchSpecification('name',
+                                                    '/^\w{10}$/');
+    $this-&gt;assertFalse($name_ten_letters-&gt;isSatisfiedBy($this-&gt;ds));
+  }
+}
+</pre>
+
+<p class="docText">上面例子中的 email 正则表达式查找“一个非空，非 @ 字符串，接着是一个 @ 字符，接着是两个或多个以点号分隔的非空，非点号字符串”。<tt>$name_ten_letters</tt> Specification 的断言要求输入的值必须刚好 10 个“单字”字符。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">正则表达式</p>
+
+<p class="docNoteText">很多书都用了整章的篇幅来介绍正则表达式，更有甚者，整本书都是在介绍这个内容。因此，请一定记住，这个 email 正则表达式只是一个简单的示例，而非一个完整的例子</p>
+
+</div>
+
+<p class="docText">我们创建最后一个具体 Specification 来验证一个字段是否大等于一个值。不奇怪，它的名字应该是 <tt>FieldGreaterThanOrEqualSpecification</tt>。</p>
+
+<pre>
+class FieldGreaterThanOrEqualSpecification {
+  protected $field;
+  protected $value;
+
+  public function __construct($field, $value) {
+    $this-&gt;field = $field;
+    $this-&gt;value = $value;
+  }
+
+  public function isSatisfiedBy($datasource) {
+    <span class="docEmphStrong">return ($datasource-&gt;get($this-&gt;field) &gt;= $this-&gt;value);</span>
+  }
+}
+</pre>
+
+<p class="docText">这里没有太多不可思议的东西：在构造函数中存储用于比较的相关字段和值，然后在 <tt>isSatisfiedBy()</tt> 方法中验证取回的字段。</p>
+
+<p class="docText">下面是一个演示实际应用中的 <tt>FieldGreaterThanOrEqualSpecification</tt> 的测试用例。</p>
+
+<pre>
+class SpecificationsTestCase extends UnitTestCase {
+  // ...
+
+  function TestFieldGreaterThanOrEqualSpecification() {
+    $adult = new FieldGreaterThanOrEqualSpecification('age', 18);
+    $presidential_age = new FieldGreaterThanOrEqualSpecification('age', 35);
+
+    $this-&gt;assertTrue($adult-&gt;isSatisfiedBy($this-&gt;ds));
+    $this-&gt;assertFalse($presidential_age-&gt;isSatisfiedBy($this-&gt;ds));
+  }
+}
+</pre>
+
+<p class="docText">你有没有注意到当 Specification 对象用合适的名字标识的时候，代码是如何开始说明它本身的？<tt>$adult-&gt;isSatisfiedBy($something)</tt> 一眼就能看明白了，根本无需深入代码的细节。这也是 Specification 模式“应该加分的地方”之一吧。</p>
+
+<p class="docText">现在，你应该很清楚，Specification 模式其实就是一个接口。在 PHP 5 中可以明确地说明这点：</p>
+
+<pre>
+interface Specification {
+  public function isSatisfiedBy($datasource);
+}
+</pre>
+
+<p class="docText">有了这些基本构件，我们把它们集中成一种更加通用的形式。因为 Specification 的 <tt>isSatisfiedBy()</tt> 方法的结果是一个布尔值，能够把布尔逻辑应用不同的具体规范是非常好的。</p>
+
+<p class="docText">为了实现逻辑与(Logical And)，创建一个可以结合两个具体规范实例的类，如果给出的 <tt>DataSource</tt> 参数同时满足给定的条件就返回 <tt>true</tt>。</p>
+
+<pre>
+class AndSpecification implements Specification {
+  protected $spec;
+  protected $andSpec;
+
+  public function __construct($spec, $andSpec) {
+    $this-&gt;spec = $spec;
+    $this-&gt;andSpec = $andSpec;
+  }
+
+  <span class="docEmphStrong">function isSatisfiedBy($datasource) {
+    return ($this-&gt;spec-&gt;isSatisfiedBy($datasource)
+    &amp;&amp; $this-&gt;andSpec-&gt;isSatisfiedBy($datasource));
+  }</span>
+}
+</pre>
+
+<p class="docText">你也可以用一个相似的结构实现逻辑或(Logical Or)：</p>
+
+<pre>
+class OrSpecification implements Specification {
+  protected $spec;
+  protected $orSpec;
+
+  public function __construct($spec, $orSpec) {
+    $this-&gt;spec = $spec;
+    $this-&gt;orSpec = $orSpec;
+  }
+
+  <span class="docEmphStrong">function isSatisfiedBy($datasource) {
+    return ($this-&gt;spec-&gt;isSatisfiedBy($datasource)
+            || $this-&gt;orSpec-&gt;isSatisfiedBy($datasource));
+  }</span>
+}
+</pre>
+
+<p class="docText">利用这些“逻辑”Specifications 和前面的一系列 Specifications，你可以执行一些复杂的验证：</p>
+
+<pre>
+class PolicyFactory {
+  public function createJasonPolicy() {
+    $name_jason = new FieldEqualSpecification('name', 'Jason');
+    $age_at_least_thirty = new FieldGreaterThanOrEqualSpecification('age', 30);
+    $male = new FieldEqualSpecification('sex', 'male');
+    <span class="docEmphStrong">$jasons_email = new OrSpecification(
+      new FieldEqualSpecification('email', 'jsweat_php@yahoo.com'),
+      new FieldEqualSpecification('email', 'jsweat@users.sourceforge.net')
+    );</span>
+
+    return new AndSpecification(
+      $name_jason,
+      new AndSpecification($age_at_least_thirty, new AndSpecification($male, $jasons_email))
+    );
+  }
+}
+</pre>
+
+<p class="docText">开始，<tt>PolicyFactory</tt> 看起来有一点零乱，主要是由于大量的临时变量被用来保存单独的具体规范的实例。然而，代码中最有趣部分是 <tt>OrSpecification</tt> 和 <tt>AndSpecification</tt> 类的使用(上面突出显示的代码)。用于 <tt>email</tt> 的 <tt>FieldEqualSpecification</tt> 的两个具体实例作为参数传递给 <tt>OrSpecification</tt> 的构造函数。因为 <tt>OrSpecification</tt> 实现了 Specification 接口，<tt>$jasons_email</tt> 对象可以像任何其它具体 Specification 实例那样处理。事实上，在随后的四行 <tt>new AndSpecification($male, $jasons_email)</tt> 中就是那样用的。</p>
+
+<p class="docText">有了 <tt>PolicyFactor</tt>，现在可以：</p>
+
+<pre>
+$jason = PolicyFactory::createJasonPolicy();
+$jason-&gt;isSatisfiedBy($datasource);
+</pre>
+
+<p class="docText">这两行代码用于验证 <tt>$datasource</tt> 的 <tt>name</tt> 字段的值是否为“<tt>Jason</tt>”，<tt>age</tt> 字段的值是否至少为 <tt>30</tt>，而且 <tt>email</tt> 是否为“<tt>jsweat_php@yahoo.com</tt>”或“<tt>jsweat@users.sourceforge.net</tt>”。</p>
+
+<p class="docText">所有这些用于保存具体规约的中间变量并不符合审美观。那么，可不可以清除这些中间变量，以使代码更容易阅读和维护？当然！只需要利用 PHP5 的一个新特性来链接从方法返回的对象的方法调用。</p>
+
+<p class="docText">第一步可能是允许单个具体 Specifications 知道如何“And”和“Or”它自己。这可以通过引入 Factory 方法(见第 3 章 —— 工厂方法模式)来创建 <tt>AndSpecification</tt> 和 <tt>OrSpecification</tt> 类来完成。既然这些功能对所有 Specification 都是通用的，所以把它们移到一个抽象基类绝对是一个很好的主意。</p>
+
+<pre>
+abstract class BaseSpecification implements Specification {
+  protected $field;
+
+  public function and_($spec) { <span class="docEmphStrong">return new AndSpecification($this, $spec);</span> }
+  public function or_($spec) { <span class="docEmphStrong">return new OrSpecification($this, $spec);</span> }
+}
+</pre>
+
+<p class="docText">有点奇怪的方法名 <tt>and_()</tt> 和 <tt>or_()</tt> 名字是必须的，因为“<tt>and</tt>”和“<tt>or</tt>”在 PHP 中是关键字。</p>
+
+<p class="docText">通过引入这个基类，必须修改为目前为止编写的所有具体类，让它们都继承 <tt>BaseSpecification</tt>：</p>
+
+<pre>
+<span class="docEmphStrong">class FieldEqualSpecification extends BaseSpecification {
+  // ...
+}</span>
+</pre>
+
+<p class="docText">下一步是引入 Factory 方法，使创建单个具体规范更加方便。这可以在一个单独的工厂类中实现，但是为了方便，你可以把这个方法添加到 <tt>PolicyFactory</tt> 类里面：</p>
+
+<pre>
+class PolicyFactory {
+  <span class="docEmphStrong">protected function equal($field, $value) {
+    return new FieldEqualSpecification($field, $value);
+  }</span>
+
+  <span class="docEmphStrong">protected function gTorEq($field, $value) {
+    return new FieldGreaterThanOrEqualSpecification($field, $value);
+  }</span>
+}
+</pre>
+
+<p class="docText">现在，我们结合这些 Factory 方法创建如下语句：</p>
+
+<pre>
+class PolicyFactory {
+  // ..
+
+  public function createJasonPolicy() {
+    return $this-&gt;equal('name', 'Jason')-&gt;and_(
+      $this-&gt;gTorEq('age', 30)-&gt;and_(
+      $this-&gt;equal('sex', 'male')-&gt;and_(
+      $this-&gt;equal('email', 'jsweat_php@yahoo.com')-&gt;or_(
+      $this-&gt;equal('email', 'jsweat@users.sourceforge.net')
+    ))));
+  }
+}
+</pre>
+
+<p class="docText"><tt>createJasonPolicy()</tt> 创建了一个和之前完全一样的策略，但代码的可读性要好得多。</p>
+
+<p class="docText">经过所有这些重构之后，现在的类图如下所示：</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch10sec03No.10.gif" /></center></p>
+
+<p class="docText">Specification 模式可以帮助你在你的应用程序的领域模型中更好地构建和组织业务逻辑。我在本书中包含这个模式的原因之一就是因为它开始显示了在真正的应用程序中模式是如何修改和组合的。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

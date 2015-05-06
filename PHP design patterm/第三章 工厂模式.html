@@ -1,0 +1,847 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第三章 The Factory Pattern —— 工厂模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h1 class="docChapterTitle">第三章 The Factory Pattern —— 工厂模式</h1>
+
+<p class="docText">在面向对象编程中，创建一个对象最常用的方法是使用 <tt>new</tt> 操作符。实际上，这个语言结构就是用来干这事儿的。但在某些情况下，<tt>new</tt> 可能会有一些问题。例如，许多对象的创建都需要一系列的步骤：可能需要计算或取得对象的初始设置；可能必须选择实例化众多子类中的哪一个；或者，可能在创建需要的对象前还必须创建一批其它辅助对象。在这些情况下，<tt>new</tt> 更像一个“过程”而非一个操作 —— 就像大型机器的一个齿轮那样。</p>
+
+
+<p class="docSection1Title">问题</p>
+
+<p class="docText">如何才能简单方便地创建这种“复杂的”对象 —— 不需要剪贴式编程？</p>
+
+
+<p class="docSection1Title">解决方法</p>
+
+<p class="docText">创建一个“工厂”—— 一个函数或一个类方法 —— 来“加工”新对象。为了了解工厂的价值，考虑一下遍布在代码中的 …</p>
+
+<pre>
+$connection =&amp; new MySqlConnection($user, $password, $database);
+</pre>
+
+<p class="docText">和更加简洁的 …</p>
+
+<pre>
+$connection =&amp; create_connection();
+</pre>
+
+<p class="docText">之间的区别。</p>
+
+<p class="docText">后面的代码片断把创建数据库连接的代码集中在 <tt>create_connection()</tt>“工厂”中。如同早先所说的那样，把创建数据库连接的过程转变成了一个简单的操作 —— 一个就像 <tt>new</tt> 一样的操作。Factory 模式为对象创建注入了“智能”。它封装了对象的创建并返回新建的对象给调用者。</p>
+
+<p class="docText">需要改变一个对象的结构或创建方式时，只需要去对象工厂，并改变一次代码就够了。(Factory 模式是如此有用。它是一个基本模式, 意味着它会在许多其它复杂的模式和程序中反复出现。)</p>
+
+
+<p class="docSection1Title">范例代码</p>
+
+<p class="docText">Factory 模式封装了对象的创建过程。可以在对象本身里面创建一个 Factory，也可以在一个外部 Factory 类中，确切的实现方法取决于应用程序需要。我们来看一个 Factory 的例子。</p>
+
+<p class="docText">下面的程序代码在多个地方重复使用了相同的代码来创建一个数据库连接：</p>
+
+<pre>
+// PHP4
+class Product {
+  function getList() {
+    <span class="docEmphStrong">$db =&amp; new MysqlConnection(DB_USER, DB_PW, DB_NAME);</span>
+    //...
+  }
+
+  function getByName($name) {
+    <span class="docEmphStrong">$db =&amp; new MysqlConnection(DB_USER, DB_PW, DB_NAME);</span>
+    //...
+  }
+
+  //...
+}
+</pre>
+
+<p class="docText">那么，为什么这样做是不好的呢？问题就在于连接参数遍布各处。虽然我用常量作参数，意味着你可以集中地全局定义它们，但这样的解决方法显然不是最佳的：</p>
+
+<ul class="docList">
+
+<li><p class="docText">虽然很容易改变参数值，但如果要增加参数或改变参数的顺序，就必须更改(至少)两段代码。</p></li>
+
+<li><p class="docText">很难实例化一个新类来使用别的数据库连接，比如说 <tt>PostgresqlConnection</tt>。</p></li>
+
+<li><p class="docText">很难独立地测试和验证连接对象的行为。</p></li>
+
+</ul class="docList">
+
+<p class="docText">使用 Factory，代码就可以得到极大的改善：</p>
+
+<pre>
+class Product {
+  function getList() {
+    <span class="docEmphStrong">$db =&amp; $this-&gt;_getConnection();</span>
+    //...
+  }
+
+  <span class="docEmphStrong">function &amp;_getConnection() {
+    return new MysqlConnection(DB_USER, DB_PW, DB_NAME);
+  }</span>
+}
+</pre>
+
+<p class="docText">类方法 <tt>_getConnection()</tt> 集中了在类的其它方法中可以找到的重复的 <tt>new MysqlConnection(DB_USER, DB_PW, DB_NAME)</tt> 调用。</p>
+
+<p class="docText">下面是 Factory 的另一种变体，这是一个对 Factory 类的静态调用：</p>
+
+<pre>
+class Product {
+  function getList() {
+    <span class="docEmphStrong">$db =&amp; DbConnectionBroker::getConnection();</span>
+    //...
+  }
+}
+
+<span class="docEmphStrong">class DbConnectionBroker {
+  function &amp;getConnection() {
+    return new MysqlConnection(DB_USER, DB_PW, DB_NAME);
+  }
+}</span>
+</pre>
+
+<p class="docText"><tt>DbConnectionBroker::getConnection()</tt> 产生与前面的 Factory 相同的结果，但有一个明显的优点：它代替了在使用数据库的每个类的每个方法中重复的 <tt>new MysqlConnection(DB_USER, DB_PW, DB_NAME)</tt> 调用。</p>
+
+<p class="docText">然而，还有另外一种变体，就是调用一个之前就已经与对象关联在一起的 Factory 类：</p>
+
+<pre>
+class Product {
+  var $_db_maker;
+
+  function setDbFactory(&amp;$connection_factory) {
+    $this-&gt;_db_maker =&amp; $connection_factory;
+  }
+
+  function getList() {
+    $db =&amp; $this-&gt;_db_maker-&gt;getConnection();
+    //...
+  }
+}
+</pre>
+
+<p class="docText">最后，Factory 也可以实现为一个过程函数，这是一种合理的，为 Factory 实现全局可见性的方法：</p>
+
+<pre>
+function &amp;make_db_conn() {
+  return new MysqlConnection(DB_USER, DB_PW, DB_NAME);
+}
+
+class Product {
+  function getList() {
+    $bar =&amp; make_db_conn();
+    //...
+  }
+}
+</pre>
+
+<p class="docText">下面就是一个理想的 Factory 实现的 UML 类图：</p>
+
+<p class="docText"><center><img src="images/ch03sec3No.01.gif" alt="" id="" /></center></p>
+
+<h4 class="docSection2Title">增加一个简单的 Color</h4>
+
+<p class="docText">为了更详细地深入了解 Factory 模式，我们前进一小步，建立一个可用作本章剩余部分示例的简单类。这是一个以十六进制形式输出 HTML <tt>RGB</tt> 颜色的类。<tt>R</tt>、<tt>G</tt>、<tt>B</tt> 值以三个参数的形式传递给构造函数，<tt>getRgb()</tt> 返回十六进制颜色值字符串。</p>
+
+<p class="docText">像之前那样，我们遵照测试驱动开发(TDD)方法：写一个测试，再写代码来满足这个测试，如果需要，就进行重构，周而复始。</p>
+
+<p class="docText">下面就是一个非常简单的最初的测试：</p>
+
+<pre>
+function TestInstantiate() {
+  $this-&gt;assertIsA($color = new Color, 'Color');
+  $this-&gt;assertTrue(method_exists($color, 'getRgb'));
+}
+</pre>
+
+<p class="docText">满足这个测试的代码，看起来跟设计这个类时在白板上写的伪代码差不多：</p>
+
+<pre>
+class Color {
+  function getRgb() {}
+}
+</pre>
+
+<p class="docText">(这个 <tt>Color</tt> 类可能看起来还像处于娃娃阶段，但 TDD 是一个反复的过程。或许，当你开始学习一个新的概念的时候，或当你解决一个特定的问题的时候，代码就会随着需求一点一点地增长。)</p>
+
+<p class="docText">接下来，<tt>getRgb()</tt> 应该基于创建 <tt>Color</tt> 对象时传递的红、绿、蓝值返回十六进制字符串。用一个测试来说明：</p>
+
+<pre>
+function TestGetRgbWhite() {
+  $white =&amp; new Color(255, 255, 255);
+  $this-&gt;assertEqual('#FFFFFF', $white-&gt;getRgb());
+}
+</pre>
+
+<p class="docText">每次 TDD，编写尽量简单的代码来满足测试，不需要符合审美观或彻底实现。</p>
+
+<p class="docText">能够通过这个测试的 <tt>Color</tt> 类的最简单的实现就是：</p>
+
+<pre>
+class Color {
+  function getRgb() {
+    return '#FFFFFF';
+  }
+}
+</pre>
+
+<p class="docText">这个 <tt>Color</tt> 不是很令人满意，但它确实显示了逐步增加的过程。</p>
+
+<p class="docText">下一步，我们增加另一个测试，使 <tt>Color</tt> 在对象内保存一些状态信息，从而得到一个更真实的实现：</p>
+
+<pre>
+function TestGetRgbRed() {
+  $red =&amp; new Color(255, 0, 0);
+  $this-&gt;assertEqual('#FF0000', $red-&gt;getRgb());
+}
+</pre>
+
+<p class="docText">那么，<tt>Color</tt> 需要做些什么修改呢？构造函数必须接受红、绿、蓝参数，并把它们保存在实例变量中。<tt>Color</tt> 还需要一个方法来把十进制整数转化为十六进制。实现这些需求的代码如下：</p>
+
+<pre>
+class Color {
+  <span class="docEmphStrong">var $r = 0;
+  var $g = 0;
+  var $b = 0;</span>
+
+  <span class="docEmphStrong">function Color($red = 0, $green = 0, $blue = 0) {
+    $this-&gt;r = $red;
+    $this-&gt;g = $green;
+    $this-&gt;b = $blue;
+  }</span>
+
+  function getRgb() {
+    <span class="docEmphStrong">return sprintf('#%02X%02X%02X', $this-&gt;r, $this-&gt;g, $this-&gt;b);</span>
+  }
+}
+</pre>
+
+<p class="docText">构造函数非常简单：收集传入构造函数的红、绿、蓝值，并把它们保存在实例变量中。<tt>getRgb()</tt> 使用 <tt>sprintf()</tt> 把值转化为十六进制。</p>
+
+<p class="docText">为了增加代码的可信度，你可以用更多的值来进行测试。测试代码为：</p>
+
+<pre>
+function TestGetRgbRandom() {
+  $color =&amp; new Color(rand(0, 255), rand(0, 255), rand(0, 255));
+  $this-&gt;assertWantedPattern('/^#[0-9A-F]{6}$/',
+                             $color-&gt;getRgb());
+
+  $color2 =&amp; new Color($t = rand(0, 255), $t, $t);
+  $this-&gt;assertWantedPattern('/^#([0-9A-F]{2})\1\1$/',
+                             $color2-&gt;getRgb());
+}
+</pre>
+
+<div class="docNote">
+
+<p class="docNoteTitle">assertWantedPattern</p>
+
+<p class="docNoteText"><tt>assertWantedPattern()</tt> 断言试图用第二个参数与第一个参数中的 PCRE 表达式进行比较。如果匹配，断言通过；否则失败。基于正则表达式匹配的强大功能，<tt>assertWantedPattern()</tt> 断言允许更加灵活的测试。</p>
+
+</div>
+
+<p class="docText">所有这些测试详细描述了在正常的预期情况下 <tt>Color</tt> 类的行为。但每个设计良好的类都应该考虑限制条件。例如，如果传递一个负数给构造函数作为颜色值会怎么样？大于 255 的数字会怎么样？非数字数据又会怎样？一个好的 <tt>Color</tt> 测试程序会在测试中解决这些限制条件。</p>
+
+<pre>
+function testColorBoundaries() {
+  $color =&amp; new Color(-1);
+  $this-&gt;assertErrorPattern('/out.*0.*255/i');
+
+  $color =&amp; new Color(1111);
+  $this-&gt;assertErrorPattern('/out.*0.*255/i');
+}
+</pre>
+
+<div class="docNote">
+
+<p class="docNoteTitle">assertErrorPattern</p>
+
+<p class="docNoteText"><tt>assertErrorPattern()</tt> 断言允许指定一个匹配 PHP 错误的 PCRE 表达式。如果错误没有产生或与指定模式不相匹配，断言失败。</p>
+
+</div>
+
+<p class="docText">有了这些测试，<tt>Color</tt> 就能进一步实现为：</p>
+
+<pre>
+class Color {
+  var $r = 0;
+  var $g = 0;
+  var $b = 0;
+
+  function Color($red = 0, $green = 0, $blue = 0) {
+    <span class="docEmphStrong">$red = (int)$red;</span>
+    <span class="docEmphStrong">if ($red &lt; 0 || $red &gt; 255) {
+      trigger_error(&quot;color '$color' out of bounds,&quot;
+        .&quot;please specify a number between 0 and 255&quot;);
+    }</span>
+    $this-&gt;r = $red;
+
+    <span class="docEmphStrong">$green = (int)$green;
+    if ($green &lt; 0 || $green &gt; 255) {
+      trigger_error(&quot;color '$color' out of bounds, &quot;
+        .&quot;please specify a number between 0 and 255&quot;);
+    }</span>
+    $this-&gt;g = $green;
+
+    <span class="docEmphStrong">$blue = (int)$blue;
+    if ($blue &lt; 0 || $blue &gt; 255) {
+      trigger_error(&quot;color '$color' out of bounds, &quot;
+        .&quot;please specify a number between 0 and 255&quot;);
+    }</span>
+    $this-&gt;b = $blue;
+  }
+
+  function getRgb() {
+    return sprintf('#%02X%02X%02X', $this-&gt;r, $this-&gt;g, $this-&gt;b);
+  }
+}
+</pre>
+
+<p class="docText">这段代码可以通过测试，但是你应该已经闻到了“剪贴”式编码的臭味。在 TDD 中，一个经验法则是尽可能采用最简单的解决方案。如果相同的代码需要两次 —— 退而求其次 —— 复制代码。然而，如果相同的代码需要三次或更多次，那么就需要进行重构了。所以，<tt>Color</tt> 很适合采用 Extract Method 重构方法。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">重构 —— Extract Method(提炼方法)</p>
+
+<p class="docNoteText">当你的代码中有两个或更多的部分相似时，可以把它们提取出来，形成一个独立的方法，并按照它的用途命名。当相同的代码片段在你的类的一个或多个方法中频频出现时，提取方法重构技术是非常强大的。</p>
+
+</div>
+
+<pre>
+class Color {
+  var $r = 0;
+  var $g = 0;
+  var $b = 0;
+
+  function Color($red = 0, $green = 0, $blue = 0) {
+    <span class="docEmphStrong">$this-&gt;r = $this-&gt;validateColor($red);
+    $this-&gt;g = $this-&gt;validateColor($green);
+    $this-&gt;b = $this-&gt;validateColor($blue);</span>
+  }
+
+  <span class="docEmphStrong">function validateColor($color) {
+    $check = (int)$color;
+    if ($check &lt; 0 || $check &gt; 255) {
+      trigger_error(&quot;color '$color' out of bounds, &quot;
+        .&quot;please specify a number between 0 and 255&quot;);
+    } else {
+      return $check;
+    }
+  }</span>
+
+  function getRgb() {
+    return sprintf('#%02X%02X%02X', $this-&gt;r, $this-&gt;g, $this-&gt;b);
+  }
+}
+</pre>
+
+
+<p class="docSection2Title">用于隐藏对象状态设置的工厂</p>
+
+<p class="docText">我们给 <tt>Color</tt> 增加一个 Factory，它可以使创建新的实例更加容易，真的很容易。我们增加一个方法，用来创建一个给定名字的 <tt>Color</tt> —— 毕竟，谁记得他或她所喜欢的颜色的 <tt>RGB</tt> 值呢？</p>
+
+<p class="docText">Factory 对象或函数并不一定非得就要以“Factory”命名。不管什么时候，只要你阅读代码，工厂非常明显。相反，最好使用一个有意义的，能够说明 Factory 如何协调你要解决的问题的名字。</p>
+
+<p class="docText">在这个例程中，我把 <tt>Color</tt> Factory 叫做 <tt>CrayonBox</tt>。静态方法 <tt>CrayonBox::getColor()</tt> 接受一个包含了颜色名字的文本字符串，并返回一个设置了恰当的值的 <tt>Color</tt> 对象。</p>
+
+<p class="docText">下面用一个测试用例说明了预期的行为：</p>
+
+<pre>
+function TestGetColor() {
+  $this-&gt;assertIsA($o =&amp; CrayonBox::getColor('red'), 'Color');
+  $this-&gt;assertEqual('#FF0000', $o-&gt;getRgb());
+
+  $this-&gt;assertIsA($o =&amp; CrayonBox::getColor('LIME'), 'Color');
+  $this-&gt;assertEqual('#00FF00', $o-&gt;getRgb());
+}
+</pre>
+
+<p class="docText">这个测试用例验证每个返回的对象都是 <tt>Color</tt> 类的一个实例，而且它的 <tt>getRgb()</tt> 方法会返回正确的字符串。用于测试的“<tt>red</tt>”全部小写，所以第二个用例，“<tt>LIME</tt>”全部大写以确保代码是与大小写无关的。</p>
+
+<p class="docText">安全起见，我们同样要增加一个额外的测试来探究那些无效的限制条件。<tt>TestBadColor()</tt> 方法需要一个无效的颜色名来抛出一个包含了无效颜色名的 PHP 错误，而且期望 Factory 返回黑色代替。</p>
+
+<pre>
+function TestBadColor() {
+  $this-&gt;assertIsA($o =&amp; CrayonBox::getColor('Lemon'), 'Color');
+  $this-&gt;assertErrorPattern('/lemon/i');
+
+  // got black instead
+  $this-&gt;assertEqual('#000000', $o-&gt;getRgb());
+}
+</pre>
+
+<p class="docText">满足这些测试的 <tt>CrayonBox</tt> 类的实现如下所示：</p>
+
+<pre>
+class CrayonBox {
+  /**
+   * Return valid colors as color name =&gt; array(red, green, blue)
+   *
+   * Note the array is returned from function call
+   * because we want to have getColor able to be called statically
+   * so we can't have instance variables to store the array
+   * @return array
+  */
+  function colorList() {
+    return array(
+      'black' =&gt; array(0, 0, 0),
+      'green' =&gt; array(0, 128, 0),
+      // the rest of the colors ...
+      'aqua' =&gt; array(0, 255, 255)
+    );
+  }
+
+  /**
+   * Factory method to return a Color
+   * @param string $color_name the name of the desired color
+   * @return Color
+  */
+  function &amp;getColor($color_name) {
+    $color_name = strtolower($color_name);
+    if (array_key_exists($color_name, $colors = CrayonBox::colorList())) {
+      $color = $colors[$color_name];
+      return new Color($color[0], $color[1], $color[2]);
+    }
+
+    trigger_error(&quot;No color '$color_name' available&quot;);
+
+    // defaul class="docList"t to black
+    return new Color;
+  }
+}
+</pre>
+
+<p class="docText">显然，这是一个很简单的工厂，但它确实简化了对象的创建(使用字面上的颜色名字，而不是 <tt>RGB</tt> 值)，并且展示了如何在创建对象的时候，但是在客户代码调用工厂取得新对象之前，建立对象的内部状态。</p>
+
+
+<p class="docSection2Title">促进多态性的工厂</p>
+
+<p class="docText">控制返回对象的内部状态固然重要，但促进多态性 —— 返回具有相同接口的各种类的对象 —— 是 Factory 模式更加强大的功能。</p>
+
+<p class="docText">我们再次回到 <tt>Monopoly</tt> 那个例子，并实现游戏的不动产道具。在游戏中，当你购买了一个道具，你就会得到一份契约；它包含一些基本的，可以在玩游戏的整个过程中使用的，关于道具的实情。此外，有三种不同类型的道具：<tt>streets</tt>、<tt>railroads</tt> 和 <tt>utilities</tt>。三种道具都有一些共同的方面：每个道具都可以被一个玩家拥有；每个都有一个价格；而且只要有别的玩家落在上面，每个都可以为它的主人赚得租金。但这些道具在某些方面又完全不同。例如，计算租金的规则就取决于道具的类型。</p>
+
+<p class="docText">下面的代码可用作一个基本的不动产道具类：</p>
+
+<pre>
+// PHP5
+abstract class Property {
+  protected $name;
+  protected $price;
+  protected $game;
+
+  function __construct($game, $name, $price) {
+    $this-&gt;game = $game;
+    $this-&gt;name = $name;
+    $this-&gt;price = new Dollar($price);
+  }
+
+  <span class="docEmphStrong">abstract protected function calcRent();</span>
+
+  public function purchase($player) {
+    $player-&gt;pay($this-&gt;price);
+    $this-&gt;owner = $player;
+  }
+
+  public function rent($player) {
+    if ($this-&gt;owner &amp;&amp; $this-&gt;owner != $player) {
+      $this-&gt;owner-&gt;collect($player($this-&gt;calcRent()));
+    }
+  }
+}
+</pre>
+
+<p class="docText">这里，<tt>Property</tt> 类和 <tt>CalcRent()</tt> 方法都被声明为 <tt>abstract</tt>。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">术语 —— Abstract Class(抽象类)</p>
+
+<p class="docNoteText">抽象类是一个不能直接实例化的类。抽象类包含一个或多个抽象方法，子类必须重载这些抽象方法。一旦所有抽象方法都用实际方法实现了，子类就能够实例化了。抽象类为一系列相似的类定义了一个很好的原型。</p>
+
+</div>
+
+<p class="docText">在子类中，必须重载 <tt>calcRent()</tt> 方法以创建一个具体类。因此，每个 <tt>Property</tt> 的子类，<tt>Street</tt>、<tt>Utility</tt> 和 <tt>Railroad</tt>，都必须定义一个 <tt>calcRent()</tt> 方法。</p>
+
+<p class="docText">这三个子类的实现如下：</p>
+
+<pre>
+class Street extends Property {
+  protected $base_rent;
+  public $color;
+
+  public function setRent($rent) {
+    $this-&gt;base_rent = new Dollar($rent);
+  }
+
+  protected function calcRent() {
+    if ($this-&gt;game-&gt;hasMonopoly($this-&gt;owner, $this-&gt;color)) {
+      return $this-&gt;base_rent-&gt;add($this-&gt;base_rent);
+    }
+    return $this-&gt;base_rent;
+  }
+}
+
+class RailRoad extends Property {
+  protected function calcRent() {
+    switch($this-&gt;game-&gt;railRoadCount($this-&gt;owner)) {
+      case 1: return new Dollar(25);
+      case 2: return new Dollar(50);
+      case 3: return new Dollar(100);
+      case 4: return new Dollar(200);
+      defaul class="docList"t: return new Dollar;
+    }
+  }
+}
+
+class Utility extends Property {
+  protected function calcRent() {
+    switch ($this-&gt;game-&gt;utilityCount($this-&gt;owner)) {
+      case 1: return new Dollar(4*$this-&gt;game-&gt;lastRoll());
+      case 2: return new Dollar(10*$this-&gt;game-&gt;lastRoll());
+      defaul class="docList"t: return new Dollar;
+    }
+  }
+}
+</pre>
+
+<p class="docText">每个子类都继承自 <tt>Property</tt> 类，并包含各自的 <tt>protected ClacRent()</tt> 方法。因为所有的抽象方法都定义了，每个子类都可以被实例化。</p>
+
+<p class="docText">为了开始游戏，必须创所有的 <tt>Monopoly</tt> 道具。既然本章讨论的是 Factory 设计模式 —— 而且因为 <tt>Monopoly</tt> 中的道具类型有很多相同之处 —— 你应该考虑使用一个多态 Factory 来创建所有必要的对象。</p>
+
+<p class="docText">首先，创建一个 <tt>Property</tt> 工厂类。在我居住的地方，County Assessor 负责处理财产税和契约，所以我把 <tt>Property</tt> 工厂命名为 <tt>Assessor</tt>。接下来，工厂必须制造所有的 <tt>Monopoly</tt> 道具。在真实的应用程序中，所有的 <tt>Monopoly</tt> 资产都可能来自一个数据库或一个配置文件。但对这个例子来说，我们只是用相关的数据硬编码了一个数组：</p>
+
+<pre>
+class Assessor {
+  protected $prop_info = array(
+    // streets
+    'Mediterranean Ave.' =&gt; array('Street', 60, 'Purple', 2),
+    'Baltic Ave.' =&gt; array('Street', 60, 'Purple', 2)，
+    //more of the streets...
+    'Boardwalk' =&gt; array('Street', 400, 'Blue', 50)，
+
+    // railroads
+    'Short Line R.R.' =&gt; array('RailRoad', 200)，
+    //the rest of the railroads...
+
+    // utilities
+    'Electric Company' =&gt; array('Utility', 150)，
+    'Water Works' =&gt; array('Utility', 150)
+  );
+}
+</pre>
+
+<p class="docText"><tt>Property</tt> 子类需要一个 <tt>Monopoly</tt> 实例作为构造函数的一部分。暂时，我只是在 <tt>Assessor</tt> 类中建了一个 setter 方法，并定义了一个实例变量，<tt>$game</tt>，来保存它。</p>
+
+<pre>
+class Assessor {
+  <span class="docEmphStrong">protected $game;</span>
+
+  <span class="docEmphStrong">public function setGame($game) {
+    $this-&gt;game = $game;
+  }</span>
+
+  protected $prop_info = array(/* ... */);
+}
+</pre>
+
+<p class="docText">尽管你很可能更喜欢一个记录数据库而非这样一个数组，但是长长的参数列表是不可避免的。如果你遇到这样的情况 —— 就像在这里 —— 考虑使用“引入参数对象”(Introduce Parameter Object)进行重构。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">重构 —— Introduce Parameter Object(引入参数对象)</p>
+
+<p class="docNoteText">长长的参数列表会使方法变得很复杂，因此也很容易导致错误。自然地，你可以引入一个封装了这些参数的对象来代替一大堆参数。例如，“<tt>start date</tt>” 和 “<tt>end date</tt>” 参数就可以用一个 <tt>DateRange</tt> 对象来代替。</p>
+
+</div>
+
+<p class="docText">对于 <tt>Monopoly</tt>，不动产道具参数对象，比如说，<tt>PropertyInfo</tt>，会是什么样子的呢？我们的意图是把每一个道具数组传都递给 <tt>PropertyInfo</tt> 的构造函数，从而得到一个新的对象。意图就意味着设计，依照 TDD，这意味着需要一个测试用例。</p>
+
+<p class="docText">下面就是一个开始拟定 <tt>PropertyInfo</tt> 类的范例测试：</p>
+
+<pre>
+function testPropertyInfo() {
+  $list = array('type', 'price', 'color', 'rent');
+  $this-&gt;assertIsA($testprop = new PropertyInfo($list), 'PropertyInfo');
+  foreach($list as $prop) {
+    $this-&gt;assertEqual($prop, $testprop-&gt;$prop);
+  }
+}
+</pre>
+
+<p class="docText">这个测试验证每个 <tt>PropertyInfo</tt> 都有四个 <tt>public</tt> 属性，并确认数组参数的确切顺序。</p>
+
+<p class="docText">但因为 <tt>RailRoad</tt> 和 <tt>Utility</tt> 实例化时并不需要颜色或租金信息，所以还需要另外一个测试来验证 <tt>PropertyInfo</tt> 也能够用一个简短的参数列表来实例化：</p>
+
+<pre>
+function testPropertyInfoMissingColorRent() {
+  $list = array('type', 'price');
+  $this-&gt;assertIsA($testprop = new PropertyInfo($list), 'PropertyInfo');
+  $this-&gt;assertNoErrors();
+  foreach($list as $prop) {
+    $this-&gt;assertEqual($prop, $testprop-&gt;$prop);
+  }
+  $this-&gt;assertNul class="docList"l($testprop-&gt;color);
+  $this-&gt;assertNul class="docList"l($testprop-&gt;rent);
+}
+</pre>
+
+<div class="docNote">
+
+<p class="docNoteTitle">assertNoErrors()</p>
+
+<p class="docNoteText"><tt>assertNoErrors()</tt> 验证没有 PHP 错误产生。如果出现了任何错误，断言就会失败。</p>
+
+</div>
+
+<div class="docNote">
+
+<p class="docNoteTitle">assertNull()</p>
+
+<p class="docNoteText">如果第一个参数是 <tt>null</tt>，<tt>assertNull()</tt> 就能通过。任何其它有效的 PHP 值都会导致断言失败。就像大多数其它 SimpleTest 断言一样，你也可以选择性地传递一个错误信息作为第二个参数。</p>
+
+</div>
+
+<p class="docText">满足前面两个测试的 <tt>PropertyInfo</tt> 类如下：</p>
+
+<pre>
+class PropertyInfo {
+  const TYPE_KEY = 0;
+  const PRICE_KEY = 1;
+  const COLOR_KEY = 2;
+  const RENT_KEY = 3;
+
+  public $type;
+  public $price;
+  public $color;
+  public $rent;
+
+  public function __construct($props) {
+    $this-&gt;type = $this-&gt;propValue($props, 'type', self::TYPE_KEY);
+    $this-&gt;price = $this-&gt;propValue($props, 'price', self::PRICE_KEY);
+    $this-&gt;color = $this-&gt;propValue($props, 'color', self::COLOR_KEY);
+    $this-&gt;rent = $this-&gt;propValue($props, 'rent', self::RENT_KEY);
+  
+
+  protected function propValue($props, $prop, $key) {
+    if (array_key_exists($key, $props)) {
+      return $this-&gt;$prop = $props[$key];
+    }
+  }
+}
+</pre>
+
+<p class="docText">这样，<tt>PropertyInfo</tt> 现在可以用作各种 <tt>Property</tt> 类的参数对象，而且 <tt>Assessor</tt> 包含创建有效 <tt>PropertyInfo</tt> 对象所需的数据。</p>
+
+<p class="docText">该是根据 <tt>Assessor-&gt;$prop_info</tt> 数组的数据创建新的 <tt>PropertyInfo</tt> 实例的时候了。</p>
+
+<p class="docText">代码如下：</p>
+
+<pre>
+class Assessor {
+  protected $game;
+  protected $prop_info = array(/* ... */);
+
+  public function setGame($game) {
+    $this-&gt;game = $game;
+  }
+
+  <span class="docEmphStrong">public function getProperty($name) {
+    $prop_info = new PropertyInfo($this-&gt;prop_info[$name]);
+    switch($prop_info-&gt;type) {
+      case 'Street':
+        $prop = new Street($this-&gt;game, $name, $prop_info-&gt;price);
+        $prop-&gt;color = $prop_info-&gt;color;
+        $prop-&gt;setRent($prop_info-&gt;rent);
+        return $prop;
+      case 'RailRoad':
+        return new RailRoad($this-&gt;game, $name, $prop_info-&gt;price);
+        break;
+      case 'Utility':
+        return new Utility($this-&gt;game, $name, $prop_info-&gt;price);
+        break;
+      defaul class="docList"t: //shoul class="docList"d not be able to get here
+    }
+  }</span>
+}
+</pre>
+
+<p class="docText">这段代码虽然实现了上述功能，但却非常脆弱。想象一下，如果你传递一个键，但是在 <tt>$this-&gt;prop_info</tt> 数组中不存在，会怎么样。因为 <tt>PropertyInfo</tt> 对象的实例化是嵌入在代码之中的，所以没有行之有效的办法来测试创建的对象。一个更好的解决方法是创建一个 Factory 方法来使 <tt>PropertyInfo</tt> 对象的创建更加方便。因此，下一步就是为 <tt>Assessor</tt> 类中的 <tt>PropertyInfo</tt> 工厂方法编写一个测试。</p>
+
+<p class="docText">可是，有一个问题：这个方法不应该是 <tt>Assessor</tt> 类的 <tt>public</tt> API 的一部分。那么，应该如何测试它呢？</p>
+
+<p class="docText">这里，有两种方法可用，并且都深入研究了大量测试理论的任何需求。简单地说，就是你可以执行黑箱测试(black box testing)或白箱测试(white box testing)。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">Black Box Testing(黑箱测试)</p>
+
+<p class="docNote">黑箱测试(Black Box Testing)把测试的对象当作一个“黑箱”，只知道对象的使用规范(也就是所发布的 API)，但却不知道实际的实现细节。因此，测试只集中在对象的 <tt>public</tt> 方法的输入输出上。</p>
+
+</div>
+
+<div class="docNote">
+
+<p class="docNoteTitle">White Box Testing(白箱测试)</p>
+
+<p class="docNoteText">白箱测试(White Box Testing)与黑箱测试(Black Box Testing)正好相反。它假设测试人员了解并能访问测试对象的所有代码。这种形式的测试的目的典型的是为了完整的代码覆盖率以及广泛的破坏条件测试。关于这种测试的更好的介绍，见 <a class="docLink" target="_blank" href="http://c2.com/cgi/wiki?WhiteBoxTesting">http://c2.com/cgi/wiki?WhiteBoxTesting</a>。</p>
+
+</div>
+
+<p class="docText">别把话题扯远了。那么，在黑箱测试和白箱测试之间有没有一种折衷的方法可以实现 TDD 呢？一种选择是在开发期间把方法定义为 <tt>public</tt>，发布时则变回 <tt>protected</tt>(应该注明任何受影响的测试)。这并不是非常令人满意的方式，因此，一种可供选择的办法就是建立对象的子类，并且在测试子类中把方法定义为 <tt>public</tt>。</p>
+
+<p class="docText">下面就是使用子类的方式：</p>
+
+<pre>
+class TestableAssessor extends Assessor {
+  public function getPropInfo($name) {
+    return Assessor::getPropInfo($name);
+  }
+}
+</pre>
+
+<p class="docText">这种解决方法的优点是你可以得到正确的 <tt>Assessor</tt> <tt>public</tt> API，但仍然允许通过 <tt>TestableAssessor</tt> 子类进行测试。另外，任何为测试而特别引入的其它代码也不会出现在正常运行的 <tt>Assessor</tt> 版本中。</p>
+
+<p class="docText">缺点是需要测试额外的类，而额外的复杂性又会引入额外的问题。而且因为你已经指定了对象的内部 API 的行为，如果你又重构了这个内部结构，你的测试就会变得脆弱不堪。</p>
+
+<p class="docText">权衡利弊，测试用例才是这个例子的正确方法，那么，就让我们开始吧。</p>
+
+<pre>
+function testGetPropInfoReturn() {
+  $assessor = new TestableAssessor;
+  $this-&gt;assertIsA($assessor-&gt;getPropInfo('Boardwalk'), 'PropertyInfo');
+}
+</pre>
+
+<p class="docText">为了确保所有调用代码传递的都是有效的键值，可以使用一个异常。当前，SimpleTest 还是一个基于 PHP4 的测试框架，所以没有任何内建特性可以用来测试异常，但你很容易就能在测试用例中回避这点。</p>
+
+<pre>
+function testBadPropNameReturnsException() {
+  $assessor = new TestableAssessor;
+  $exception_caught = false;
+
+  try {
+    $assessor-&gt;getPropInfo('Main Street');
+  } catch (InvalidPropertyNameException $e) {
+    $exception_caught = true;
+  }
+
+  $this-&gt;assertTrue($exception_caught);
+  $this-&gt;assertNoErrors();
+}
+</pre>
+
+<p class="docText">最后，<tt>Assessor</tt> 被完整地实现了：</p>
+
+<pre>
+class Assessor {
+  protected $game;
+  protected $prop_info = array(/* ... */);
+
+  public function setGame($game) {
+    $this-&gt;game = $game;
+  }
+
+  public function getProperty($name) {
+    <span class="docEmphStrong">$prop_info = $this-&gt;getPropInfo($name);</span>
+    switch($prop_info-&gt;type) {
+      case 'Street':
+        $prop = new Street($this-&gt;game, $name, $prop_info-&gt;price);
+        $prop-&gt;color = $prop_info-&gt;color;
+        $prop-&gt;setRent($prop_info-&gt;rent);
+        return $prop;
+      case 'RailRoad':
+        return new RailRoad($this-&gt;game, $name, $prop_info-&gt;price);
+        break;
+      case 'Utility':
+        return new Utility($this-&gt;game, $name, $prop_info-&gt;price);
+        break;
+      defaul class="docList"t: //shoul class="docList"d not be able to get here
+    }
+  }
+
+  <span class="docEmphStrong">protected function getPropInfo($name) {
+    if (!array_key_exists($name, $this-&gt;prop_info)) {
+      throw new InvalidPropertyNameException($name);
+    }
+    return new PropertyInfo($this-&gt;prop_info[$name]);
+  }</span>
+}
+</pre>
+
+<p class="docText"><tt>Assessor::getPropInfo()</tt> 方法从逻辑上说明 <tt>PropertyInfo</tt> 工厂被当成了 <tt>Assessor</tt> 类的一个 <tt>protected</tt> 方法。而 <tt>Assessor::getProperty()</tt> 方法是返回三个 <tt>Property</tt> 子类之一的 <tt>public</tt> 工厂，至于返回哪个，就要视请求的道具的名字而定了。</p>
+
+
+<p class="docSection2Title">用于延迟加载的工厂</p>
+
+<p class="docText">另一个使用 Factory 的重要好处就是它能够延迟加载。这种情况大多发生在当工厂实例化大量的定义在单独的 PHP 源文件中的子类的时候。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">术语 —— Lazy Loading(延迟加载)</p>
+
+<p class="docNoteText">术语延迟加载指的是在脚本绝对需要之前，不执行开销很大的操作(通常指的是像包含 PHP 文件或查询数据库那样的 IO 操作)。</p>
+
+</div>
+
+<p class="docText">通过一个单一脚本动态控制多个页面，这是一种 Web 站点常用的技术。考虑可能包含不同页面的 blog 软件，它们分别用于浏览最近条目，带注释的一条单一条目，注释提交页面，存档导航页面，管理员管理页面，等等。你可以把生成每个页面的逻辑封装在一个类中，并使用一个 Factory 来加载类定义和对象。这些类可以存放在应用程序的一个 'pages' 子目录下的独立的文件中。</p>
+
+<p class="docText">实现延迟加载页面工厂的代码如下：</p>
+
+<pre>
+class PageFactory {
+  function &amp;getPage() {
+    $page = (array_key_exists('page', $_REQUEST))
+      ? strtolower($_REQUEST['page'])
+      : '';
+    switch ($page) {
+      case 'entry':
+        $pageclass = 'Detail';
+        break;
+      case 'edit':
+        $pageclass = 'Edit';
+        break;
+      case 'comment':
+        $pageclass = 'Comment';
+        break;
+      defaul class="docList"t:
+        $pageclass = 'Index';
+    }
+
+    if (!class_exists($pageclass)) {
+      <span class="docEmphStrong">require_once 'pages/'.$pageclass.'.php';</span>
+    }
+
+    return new $pageclass;
+  }
+}
+</pre>
+
+<p class="docText">你可以利用 PHP 的动态特性，使用运行时逻辑来决定希望创建的类名。本例中，一个 HTTP 请求参数，<tt>page</tt>，用来决定请求的是哪个页面。你可以实现延迟加载，这样只在准备创建新的对象时才载入相应的类，而不用每次脚本执行期间都加载所有可能的“<tt>page</tt>”类。上述例子中的有条件 <tt>require_once</tt> 就是实现这一点的。这种技术在装有 PHP accelerator —— 一种字节码缓存 —— 的系统上并不那么重要，因为在那些系统上包含额外的源代码的开销几乎可以忽略不计。但对大多数典型的 PHP 服务器来说，这是一种很好的增强性能的方法。</p>
+
+<p class="docText">欲更加详细地了解 lazy loading，请阅读第十一章 —— 代理模式。</p>
+
+
+<p class="docSection1Title">小结</p>
+
+<p class="docText">Factory 模式非常简单，但却十分强大。在你的代码中，可能已经有了使用这个模式的例子，而且，很快，你还会发现更多的例子。GoF 一书还介绍了另外几种相关的构造型模式：AbstractFactory 和 Builder。其中，AbstractFactory 用于处理一系列相关的组件，而 Builder 则被设计来简化复杂对象的创建。</p>
+
+<p class="docText">本章的很多例子，都传递了一个参数给工厂方法(e.g. <tt>CrayonBox::getColor('red');</tt>)。GoF 称之为“参数化工厂”(Parameterized Factory)，在 PHP web 应用程序中，它是我所见到的最典型的 Factory 方法。</p>
+
+<p class="docText">现在，你已经了解 Factory 模式了，这是一种用来在代码中管理新对象的创建的技术。你已经看到了 Factory 模式是如何集中复杂对象的创建过程，甚至替换不同类的对象的。最后，工厂还支持非常重要的，在 OOP 中占首要地位的多态性。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

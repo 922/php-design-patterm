@@ -1,0 +1,308 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第四章 The Singleton Pattern —— 单子模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第四章 The Singleton Pattern —— 单子模式</h2>
+
+<p class="docText">几乎在每个面向对象程序中，都会有那么一两个资源，它们只会被创建一次，并在整个程序范围内共享。例如，电子商务应用程序中的数据库连接就是一个这样的资源：它在程序装入时被初始化，用来执行所有的事务，最后，当程序结束运行时，被断开并销毁。在你的代码中，没必要每次都创建一个数据库连接；那就如一场激战，而且十分低效。相反，你的代码应该简单地重用已经建立的连接。于是，需要解决的问题就是如何引用这个连接(或任何其它唯一的持久性资源，比如一个打开的文件或一个队列)。</p>
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">如何确保一个特定类的实例是独一无二的(它总是这个类的唯一实例)，进而也是容易访问的呢？</p>
+
+
+<h3 class="docSection1Title">解决方案</h3>
+
+<p class="docText">当然，全局变量是一个显而易见的解决方法，但它也是一个潘多拉盒子(这是一句谚语，“<span class="docEmphasis">正确的判断来自经验，但经验往往来自错误的判断</span>”)。你代码的任何部分都可以修改一个全局变量，引起无穷的调试大量偶然出现的问题的负担的加重。换句话说，全局变量的状态总是可疑的。(有关全局变量问题的一个不错的描述可以在 <a class="docLink" target="_blank" href="http://c2.com/cgi/wiki?GlobalVariablesAreBad">http://c2.com/cgi/wiki?GlobalVariablesAreBad</a> 找到。)</p>
+
+<p class="docText">当你需要一个特定类的唯一实例的时候，使用被恰当命名的 Singleton 模式。典型的，通过一个命名为 <tt>getInstance()</tt> 的静态方法，一个基于 Singleton 模式的类可以恰当地实例并初始化它的一个实例，提供每次访问完全相同的对象。</p>
+
+<p class="docText">这个模式的关键就是每次都得到完全相同的实例，值得测试：</p>
+
+<pre>
+// PHP4
+function TestGetInstance() {
+  $this-&gt;assertIsA($obj1 =&amp; DbConn::getInstance(),
+                   'DbConn',
+                   'The returned object is an instance of DbConn');
+  $this-&gt;assertReference($obj1,
+                         $obj2 =&amp; DbConn::getInstance(),
+                         'Two calls to getInstance() return the same object');
+}
+</pre>
+
+<div class="docNote">
+
+<p class="docNoteTitle">assertReference</p>
+
+<p class="docNoteText"><tt>assertReference()</tt> 确保传递的两个参数是同一个 PHP 变量的引用。</p>
+
+<p class="docNoteText">在 PHP4 中，这个方法断言测试的两个参数实际上是同一个对象。当 SimpleTest 升级到 PHP5 的时候，<tt>assertReference()</tt> 可能会被废除。</p>
+
+</div>
+
+
+<p class="docText">这个测试方法做了两个断言：第一个验证调用静态 <tt>DbConn::getInstance()</tt>方法返回的值是 <tt>DbConn</tt> 类的一个实例，第二个验证第二次调用 <tt>getInstance()</tt> 返回相同的引用，这意味着它正是同一个对象。</p>
+
+<p class="docText">除了断言代码的预期行为，这个测试还示范了 <tt>getInstance()</tt> 的正确用法(PHP4)：<tt>$local_conn_var =&amp; DbConn::getInstance();</tt>。局部变量通过引用 (<tt>=&amp;</tt>) 被赋值为静态方法调用的结果。</p>
+
+<p class="docText">还需要编写另一个测试，至少现在需要：验证通过 <tt>new</tt> 直接实例化一个 Singleton 类会引起某种错误。下面就是这个测试：</p>
+
+<pre>
+function TestBadInstantiate() {
+  $obj =&amp; new DbConn;
+  $this-&gt;assertErrorPattern('/(bad|nasty|evil|do not|don\'t|warn).*'
+    .'(instance|create|new|direct)/i');
+}
+</pre>
+
+<p class="docText">这段代码通过直接使用 <tt>new</tt> 创建 <tt>DbConn</tt> 类的一个实例，这应该引起一个 PHP 错误。为了使测试更加健壮，一个 PCRE 正则表达式被用来匹配错误信息。(错误信息的确切措词无关痛痒。)</p>
+
+
+<h3 class="docSection1Title">范例代码</h3>
+
+<p class="docText">Singleton 是一个有趣的模式。我们同时介绍它在 PHP4 和 PHP5 中的实现，从 PHP4 开始。</p>
+
+
+<h4 class="docSection2Title">全局方式</h4>
+
+<p class="docText">从概念上讲，全局变量构成了一个理想的 Singleton，但全局变量是不可预知的：不能保证在脚本的整个过程中它都包含完全相同的对象。然而，通过从不直接引用全局变量，你可以轻易解决“任意访问”的问题。例如，这段代码使用一个很长的唯一的描述性名字，把 Singleton 的引用“隐藏”在一个全局变量中。</p>
+
+<pre>
+class DbConn {
+  function DbConn($fromGetInstance = false) {
+    if (M_E != $fromGetInstance) {
+      trigger_error('The DbConn class is a Singleton,
+        please do not instantiate directly.');
+    }
+  }
+
+  function &amp;getInstance() {
+    $key = '__some_unique_key_for_the_DbConn_instance__';
+
+    if (!(array_key_exists($key, $GLOBALS)
+        &amp;&amp; is_object($GLOBALS[$key])
+        &amp;&amp; 'dbconn' == get_class($GLOBALS[$key]))) {
+      $GLOBALS[$key] =&amp; new DbConn(M_E);
+    }
+
+    return $GLOBALS[$key];
+  }
+}
+</pre>
+
+<p class="docText">你可能觉得 <tt>DbConn</tt> 构造函数中的默认参数 <tt>$fromGetInstance</tt> 很奇怪。它提供(很微弱的)保护，以防对象被直接实例化：除非默认值被改为 <tt>e</tt>(PHP 数学常数 <tt>M_E = 2.718281828459</tt>)，否则将抛出一个错误。<tt>getInstance()</tt> 方法调用 <tt>new DbConn(M_E)</tt>，从而以正确的方式创建对象。</p>
+
+<p class="docText">用一个 UML 类图表示，解决方案如下：</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch04sec03No.01.gif" /></center></p>
+
+<p class="docText">如果你对这种“秘密参数”方式的保护不感冒，另一种选择是创建一个全局令牌，用它验证你是从 <tt>getInstance()</tt> 方法创建的对象。这种方式把保护条件从“你知道的”改为“系统中的”。</p>
+
+<p class="docText">下面就是使用全局标志的构造保护代码的例子：</p>
+
+<pre>
+class DbConn {
+  function DbConn() {
+    $token = '__some_DbConn_instance_create_semaphore__';
+
+    if (!array_key_exists($token, $GLOBALS)) {
+      trigger_error('The DbConn class is a Singleton,
+        please do not instantiate directly.');
+    }
+  }
+
+  function &amp;getInstance() {
+    static $instance = array();
+
+    if (!$instance) {
+      $token = '__some_DbConn_instance_create_semaphore__';
+      $GLOBALS[$token] = true;
+      $instance[0] =&amp; new DbConn;
+      unset($GLOBALS[$token]);
+    }
+
+    return $instance[0];
+  }
+}
+</pre>
+
+<p class="docText">这段代码的另一个重要方面是引用操作符 <tt>&amp;</tt> 的使用。有两个地方需要用到 <tt>&amp;</tt>。第一个是在函数定义中，函数名的前面，它表明 <tt>return</tt> 是一个引用。第二个是把 <tt>DbConn</tt> 对象赋值给 <tt>$GLOBALS</tt> 数组。(两个都用来强调在引言和值对象模式一章提及的观点：在 PHP4 代码中，你几乎总是需要通过引用来创建、传递和返回对象，导致 <tt>&amp;</tt> 操作符在代码中大量繁殖。)</p>
+
+<p class="docText"><tt>getInstance()</tt> 方法中的条件判断被设计成总是可以运行，不会产生警告，即使是在 <tt>E_ALL</tt> 错误报告级别也不会。它验证在 <tt>$GLOBALS</tt> 数组的适当的位置有一个 <tt>DbConn</tt> 类的对象，如果没有，就创建一个。然后，返回对象。对象可能是，也可能不是在这次调用中创建的，但是一旦方法结束，你就可以确信已经拥有这个类的一个有效实例，而且已经被正确初始化了。</p>
+
+
+<h4 class="docSection2Title">静态方式</h4>
+
+<p class="docText">全局变量解决方法有一个问题，即便全局变量的访问隐藏在 <tt>getInstance()</tt> 中。仅仅因为变量潜伏在脚本的任何地方，在没有注意到的情况下，你仍然潜在地可能破坏这个全局变量。</p>
+
+<p class="docText">一个更加清晰的解决方法是使用 <tt>getInstance()</tt> 方法内的一个静态变量来存储 Singleton。对代码的第一次修改如下：</p>
+
+<pre>
+class DbConn {
+  // ...
+
+  function &amp;getInstance() {
+    static $instance = false;
+
+    if (!$instance) $instance =&amp; new DbConn(M_E);
+    return $instance;
+  }
+}
+</pre>
+
+<p class="docText">唉！PHP4 的 Zend 1 引擎不能在静态变量中存储引用(见 <a class="docLink" target="_blank" href="http://www.php.net/manual/en/language.variables.scope.php#AEN3609">http://www.php.net/manual/en/language.variables.scope.php#AEN3609</a>)。一个折衷的方法是使用一个静态数组，然后把你的 Singleton 实例引用放在数组的一个已知索引中。于是，<tt>getInstance()</tt> 方法可能看起来像：</p>
+
+<pre>
+class DbConn {
+  function DbConn($fromGetInstance = false) {
+    if (M_E != $fromGetInstance) {
+      trigger_error('The DbConn class is a Singleton,
+        please do not instantiate directly.');
+    }
+  }
+
+  function &amp;getInstance() {
+    static $instance = array();
+
+    if (!$instance) $instance[0] =&amp; new DbConn(M_E);
+    return $instance[0];
+  }
+}
+</pre>
+
+<p class="docText">这段代码简单地选择静态 <tt>$instance</tt> 数组的第一个元素来存放我们的 Singleton <tt>DbConn</tt> 实例的引用。</p>
+
+<p class="docText">这个版本比全局变量那个版本严谨得多，尽管它确实有点依赖 PHP 的布尔魔术转换：在条件判断中，空数组相当于 <tt>false</tt>。与之前的 <tt>DbConn</tt> 版本中一样，函数定义和赋值中都需要引用操作符。</p>
+
+
+<h4 class="docSection2Title">PHP5 中的 Singleton</h4>
+
+<p class="docText">在 PHP5 中实现 Singleton 要容易得多，因为 PHP5 在类中为变量和函数提供并加强了可见性。通过把 <tt>DbConn::__construct()</tt> 方法定义为 <tt>private</tt>，就没有代码可以直接实例化这个类了。用一个 UML 类图表示，一个 PHP5 <tt>DbConn</tt> Singleton 看起来像：</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch04sec03No.10.gif" /></center></p>
+
+<p class="docText">组合使用静态方法变量保存实例，<tt>private</tt> 构造函数防止意外构造，现在的类像：</p>
+
+<pre>
+class DbConn {
+  /**
+   * static property to hold Singleton instance
+   */
+  static $instance = false;
+
+  /**
+   * constructor
+   * private so only getInstance() method can instantiate
+   * @return void
+   */
+  private function __construct() {}
+
+  /**
+   * factory method to return the Singleton instance
+   * @return DbConn
+   */
+  public function getInstance() {
+    if (!DbConn::$instance) {
+      DbConn::$instance = new DbConn;
+    }
+
+    return DbConn::$instance;
+  }
+}
+</pre>
+
+
+<h3 class="docSection1Title">小结</h3>
+
+<p class="docText">现在，你已经看到了 Singleton 设计模式的几种可能的实现，我们再来看一些当准备实现这个设计模式时你应该考虑的一些问题。</p>
+
+<p class="docText">首先，Singleton 并不是一个“更好的”全局变量。例如，如果一个方法需要一个 Singleton，那么把它当作一个参数来传递，可以使它的使用更加透明。</p>
+
+<p class="docText">同样，因为它可以在程序中“全局”使用，你很容易就会将所有的“工具函数”都集中到一个 Singleton 类。要尽量避免这样做，Singleton 的方法应该限制为那些对类有目的的功能。</p>
+
+<p class="docText">有关这些问题的更多在线讨论在：</p>
+
+<ul class="docList">
+
+<li><p class="docText"><a class="docLink" target="_blank" href="http://c2.com/cgi/wiki?SingletonGlobalProblems">http://c2.com/cgi/wiki?SingletonGlobalProblems</a></p></li>
+
+<li><p class="docText"><a class="docLink" target="_blank" href="http://c2.com/cgi/wiki?GlobalVariablesAreBad">http://c2.com/cgi/wiki?GlobalVariablesAreBad</a></p></li>
+
+</ul>
+
+<h4 class="docSection2Title">The MonoState Pattern(单态模式)：Stealth Singletons</h4>
+
+<p class="docText">有时，我们需要这样一个类，类的所有实例都共享一个全局状态 —— 换句话说，任何类的实例都返回完全相同的信息。与 Singleton 行为相似，这是一个叫做 MonoState 的设计模式(<a class="docLink" target="_blank" href="http://c2.com/cgi/wiki?MonoStatePattern">http://c2.com/cgi/wiki?MonoStatePattern</a>)。</p>
+
+<p class="docText">在 PHP 中，通过使用引用把全局数据绑定到一个实例变量，你可以巧妙地实现 MonoState。</p>
+
+<p class="docText">举一个例子，让我们创建一个全局应用配置类。不管你访问这个 MonoState 类的哪个实例，你都能得到相同的值。</p>
+
+<p class="docText">下面就用一个测试来说明这些需求：</p>
+
+<pre>
+// PHP4
+function TestApplConfig() {
+  $this-&gt;assertIsA($obj1 =&amp; new ApplicationConfig,
+                   'ApplicationConfig');
+  $this-&gt;assertIsA($obj2 =&amp; new ApplicationConfig,
+                   'ApplicationConfig');
+
+  $test_val = '/path/to/cache'.rand(1, 100);
+  $obj1-&gt;set('cache_path', $test_val);
+  $this-&gt;assertEqual($test_val,
+                     $obj2-&gt;get('cache_path'));
+}
+</pre>
+
+<p class="docText">这个测试创建了 MonoState 类的两个不同实例，改变其中一个，然后验证另一个是否确实也被改变了。</p>
+
+<p class="docText">下面就是实现 MonoState 的代码：</p>
+
+<pre>
+class ApplicationConfig {
+  var $_state;
+
+  function ApplicationConfig() {
+    $key = '__stealth_Singleton_state_index__';
+
+    if (!(array_key_exists($key, $GLOBALS)
+        &amp;&amp; is_array($GLOBALS[$key]))) {
+      $GLOBALS[$key] = array();
+    }
+    $this-&gt;_state =&amp; $GLOBALS[$key];
+  }
+
+  function set($key, $val) {
+    $this-&gt;_state[$key] = $val;
+  }
+
+  function get($key) {
+    if (array_key_exists($key, $this-&gt;_state)) {
+      return $this-&gt;_state[$key];
+    }
+  }
+}
+</pre>
+
+<p class="docText">这个技巧的关键在于 <tt>$this-&gt;_state =&amp; $GLOBALS[$key];</tt>。证实了 <tt>$GLOBALS[$key]</tt> 是一个数组后，代码绑定全局数组的一个引用到类变量 <tt>$this-&gt;_state</tt>。之后，任何对 <tt>$this-&gt;_state</tt> 的改变都同步到全局数组，因此，也同步到类的任何其它实例。</p>
+
+<p class="docText">这个技巧可以与任何 PHP 的超全局数组一起使用，而和 <tt>$_SESSION</tt> 一起用于用户消息队列则尤其有效。MonoState 可以存储一系列消息供用户在整个代码中使用(但在实际显示消息之前，你可以重定向到另一个页面)。<tt>$_SESSION</tt> 是存储这些消息，以便重定向后它们可以持续存在的好地方。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

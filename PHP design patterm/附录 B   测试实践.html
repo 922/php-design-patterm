@@ -1,0 +1,746 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>附录 B   SimpleTest Testing Practices —— SimpleTest 测试习惯</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docAppendixTitle">附录 B   SimpleTest Testing Practices —— SimpleTest 测试习惯</h2>
+
+<p class="docText">尽管测试你的代码(testing your code)并没有明确地涉及到设计模式的实现，但测试你的代码是一个如此强大的编码工具，以至于它被紧密地融入到了本书的内容之中。本书所给出测试，不仅确保了代码的正确性，而且还暗示了代码片段应该如何运行。</p>
+
+<p class="docText">实现自动测试最实用的方法就是用一个测试框架(testing framework)，它们大多数都源自于 <tt>JUnit</tt>(<a class="docLink" target="_blank" href="http://junit.org/">http://junit.org/</a>) 的设计。也存在相当多的 PHP 测试框架，它们中的百分之九十都以 <tt>PHPUnit</tt>(见 <a class="docLink" target="_blank" href="http://www.google.com/search?q=phpunit">http://www.google.com/search?q=phpunit</a>) 命名。Sebastian Bergmann 的 <tt>PHPUnit2</tt> 似乎是开发最活跃的一个，而且从 2004 年 7 月起就开始支持 PHP5 了(<a class="docLink" target="_blank" href="http://pear.php.net/package/PHPUnit2/download">http://pear.php.net/package/PHPUnit2/download</a>)。</p>
+
+<p class="docText">本书使用 <tt>SimpleTest</tt>(<a class="docLink" target="_blank" href="http://sf.net/projects/simpletest/">http://sf.net/projects/simpletest/</a>)。它包含优秀的教程和文档，而且还支持 web 测试以及 Mock Object 测试模式(见第 6 章 —— 模拟对象模式)。</p>
+
+<p class="docText">本附录还包含一些补充材料，它们能够帮助提升你的测试技能。尤其值得一提的是，本附录专门用了一节来介绍“基本框架”(scaffolding)以及如何更好地组织和执行你的测试代码；本附录还用了一节来介绍 <tt>SimpleTest</tt> 的 <tt>WebTestCase</tt> 特性，它允许你把你的整个 web 应用程序当作一个“黑箱”来进行测试，就像一个终端用户所做的那样；另外，你还会读到有关 Partial Mock Object(部分模拟对象) 技术的内容。通过系统地替换内部 Factory 方法，它可以有效地用于把 Mock Objects 引入测试代码。</p>
+
+
+<h3 class="docSection1Title">SimpleTest 使用最优习惯</h3>
+
+<p class="docText"><tt>SimpleTest</tt> 是一个由 Marcus Baker 开发的单元测试框架(unit testing framework)。虽然 <tt>SimpleTest</tt> 的当前版本是为 PHP4 写的，但运行在 PHP5 上也只会有很少的问题。你可以查看 <a class="docLink" target="_blank" href="http://simpletest.org/">http://simpletest.org/</a> 或 <a class="docLink" target="_blank" href="http://www.lastcraft.com/simple_test.php">http://www.lastcraft.com/simple_test.php</a> 的 SimpleTest 文档和教程。这些文档和教程为使用这个工具提供了非常全面的介绍。</p>
+
+<p class="docText">为一个合理大小的项目建立一个测试集，第一步就是创建一个项目所特有的测试包含文件。这个文件的主要内容应该是一个为你的项目特别编写的 UnitTestCase 子类。</p>
+
+<p class="docText">代码的第一行应该是一个 <tt>SIMPLE_TEST</tt> 常量定义。<tt>SIMPLE_TEST</tt> 既是一个历史产物，也是一个非常有用的特性；在过去的几个版本中，SimpleTest 本身要用到这个常量，但是这个依赖关系现在已经被去除了。另外，考虑到实用性，这个常量可以用来指示你当前正在运行的是一个测试(通常，在测试环境下，修改你代码的行为并不是一个好习惯，但你有可能这么做的一个例子就是，在运行测试用例的时候用来预防你项目中的 <tt>exit()</tt>)，也可以用来记录库路径。</p>
+
+<pre>
+/**
+ * relative path to SimpleTest
+ * @ignore
+ */
+if (!defined('SIMPLE_TEST')) define('SIMPLE_TEST', 'simpletest/');
+</pre>
+
+<p class="docText">一旦定义了这个常量，你就可以在每个测试用例中用它来包含 SimpleTest 文件：</p>
+
+<pre>
+/**#@+
+ * SimpleTest includes
+ */
+require_once SIMPLE_TEST.'unit_tester.php';
+require_once SIMPLE_TEST.'reporter.php';
+require_once SIMPLE_TEST.'mock_objects.php';
+require_once SIMPLE_TEST.'web_tester.php';
+/**#@-*/
+</pre>
+
+<p class="docText">我还有一个好习惯，就是把所有的测试用例都直接放在项目根目录之下的“<tt>tests/</tt>”子目录中。(这种习惯有一个问题，就是在测试环境下，可能破坏任何依赖于从这个项目的根目录相对包含的代码。不过，这个问题可以通过给包含路径增加父目录“<tt>../</tt>”来解决。) 另外，我还会包含程序的所有公共配置(比如包含基本库，常量定义，等等)。</p>
+
+<pre>
+/**
+ * modify php include path to include parent directory
+ *
+ * this is required because the tests are run from
+ * the tests subdirectory and the application is run from
+ * (and coded for) the parent directory
+ * @ignore
+ */
+if (!defined('TEST_PATH_MODIFIED')) {
+  ini_set('include_path', '..:'.ini_get('include_path'));
+  define('TEST_PATH_MODIFIED', true);
+}
+
+/**
+ * include standard setup file for this application
+ */
+require_once 'setup.php';
+</pre>
+
+<p class="docText">最后，我会创建一个项目所特有的 <tt>UnitTestCase</tt> 类的子类来进行测试。然后，你可以在这个类中包含这个项目所特有的断言和工具函数，并让它们可用于你所有的测试用例。</p>
+
+<pre>
+/**
+ * UnitTestCase for myProject application
+ * @packagemyProject
+ * @subpackagetests
+ */
+class MyProjectUnitTestCase extends UnitTestCase {
+  function projAssertSomething() {}
+  function projHelperUtil() {}
+}
+</pre>
+
+<p class="docText">我还强烈地建议你让你的测试用例尽可能的易于运行。这意味着几个方面。首先，你应该能够为你代码的一个方面运行一个具体的单元测试用例或用例集合，而且你还应该能够运行你所写的每个测试。</p>
+
+<p class="docText">通过浏览器或命令行方式运行你的测试也是很有帮助的。后者的处理很简单：检测你是否正在使用 CLI 接口，然后选择合适的测试运行器来执行测试；</p>
+
+<pre>
+if (TextReporter::inCli()) {
+  exit ($test-&gt;run(new TextReporter()) ? 0 : 1);
+}
+$test-&gt;run(new HtmlReporter());
+</pre>
+
+<p class="docText">选择并运行单独的测试还是整个测试集取决于你如何组织你的测试用例文件和测试。</p>
+
+<p class="docText">如果你没有用一个索引文件，但是你的 web 服务器允许自动索引，你就可以通过点击测试用例的文件名来运行单独的测试用例。这种情况下，每个测试用例都必须区别它是在单独地运行呢，还是作为一个更大的测试集的组成部分并适当地运行。</p>
+
+<p class="docText">另外，我还发现，在每个文件中，我通常会定义不止一个测试用例，因为我可以为实际的单元测试定义一个 <tt>UnitTestCase</tt>，而另一个则用作综合测试。由于这种可能性，我甚至还会在单独的测试文件中定义一个单一的测试用例来作为分组测试(group tests)。下面就是一个经过简化的(trimmed down)例子：</p>
+
+<pre>
+require_once 'myprojunittestcase.php';
+
+class TestSomething extends MyProjUnitTestCase {
+  function TestSomething($name) {
+    $this-&gt;UnitTestCase($name);
+  }
+
+  function setup() {}
+  function teardown() {}
+
+  function TestSomething() {
+    $this-&gt;assertTrue(true, 'this should pass');
+  }
+}
+
+class TestSomethingIntegration extends MyProjUnitTestCase {
+  //...
+}
+
+//run if stand alone
+if (!isset($this)) {
+  $test =&amp; new GroupTest('Something Unit Test');
+  $test-&gt;addTestCase(new TestSomething );
+  $test-&gt;addTestCase(new TestSomethingIntegration);
+
+  if (TextReporter::inCli()) {
+    exit ($test-&gt;run(new TextReporter()) ? 0 : 1);
+  }
+  $test-&gt;run(new HtmlReporter());
+}
+</pre>
+
+<p class="docText">你还需要一个文件来运行你的项目的整个测试集。我通常把这个文件想当然地命名为“run.php”。在这个文件中，使用 <tt>$this-&gt;addTestFile(...)</tt> 为每个测试把每个单独的测试用例文件加入到一个单一的分组测试(group test)。这个文件的部分代码如下所示：</p>
+
+<pre>
+define('SIMPLE_TEST', 'simpletest/');
+
+require_once 'myprojunittestcase.php';
+
+$test =&amp; new GroupTest('My Project Application Tests');
+$test-&gt;addTestFile('testsomething.php');
+//...
+
+set_time_limit(0);
+
+if (TextReporter::inCli()) {
+  exit ($test-&gt;run(new TextReporter()) ? 0 : 1);
+}
+$test-&gt;run(new HtmlReporter());
+</pre>
+
+<p class="docText">如果你的测试需求比这还要复杂，你应该看一下 <a class="docLink" target="_blank" href="http://wact.sf.net/test/">http://wact.sf.net/test/</a> 和 <a class="docLink" target="_blank" href="http://cvs.sf.net/viewcvs.py/wact/wact/tests/">http://cvs.sf.net/viewcvs.py/wact/wact/tests/</a> 的用于运行 Web 应用程序组件工具箱(Web Application Component Toolkit，WACT)测试集的代码。</p>
+
+
+<h4 class="docSection2Title">Mock Objects(模拟对象)</h4>
+
+<p class="docText">我们在第 6 章深入讲解了 Mock Objects，但是作为这个关于测试习惯的讨论的组成部分，让我们再次回顾一下这个概念。</p>
+
+<p class="docText">Mock Objects 采用五步测试的模式：</p>
+
+<ul class="docList">
+
+<li><p class="docText">创建 Mock Objects(生成 Mock Object 代码，实例)。</p></li>
+
+<li><p class="docText">设置 Mock Objects 的状态(返回值，等等)。</p></li>
+
+<li><p class="docText">建立 Mock Objects 的预期(用‘<tt>Y</tt>’参数调用 <tt>X()</tt> 方法，<tt>Z()</tt> 方法永远不应该调用，等等)。</p></li>
+
+<li><p class="docText">以 Mock Objects 为参数调用你要测试的代码。</p></li>
+
+<li><p class="docText">验证 Mock Objects 的预期。</p></li>
+
+</ul>
+
+<p class="docText">使用 Mock Object 的经典示例就是在一个类中模拟数据库交互。下面的例子演示了如何模拟由流行的 <tt>ADOdb</tt>(<a class="docLink" target="_blank" href="http://adodb.sf.net/">http://adodb.sf.net/</a>) 数据库访问库(第 14 章到 16 章介绍的与数据库相关的模式就是使用它作数据库访问层)提供的 <tt>Oracle</tt> 驱动器。</p>
+
+<pre>
+// PHP5 code
+function TestGetData() {
+  $this-&gt;assertTrue(defined('SomeModel::DATA_FUNCT'),
+                    'DATA_FUNCT constant defined');
+
+  $c = new MockADODBConnection($this);
+  $rs = new MockADORecordSet($this);
+
+  $test_parm = 5;
+  $test_array = array(
+    array('testkey' =&gt; 'testval1'),
+    array('testkey' =&gt; 'testval2')
+  );
+  $rs-&gt;SetReturnValue('GetArray', $test_array);
+  $rs-&gt;ExpectOnce('GetArray');
+
+  $c-&gt;SetReturnReference('execute', $rs);
+  $expect = array(
+    new WantedPatternExpectation(
+      '/'.preg_quote(SomeModel::DATA_FUNCT,'/').'/'),
+    array('FOO' =&gt; $test_parm)
+  );
+  $c-&gt;ExpectOnce('execute', $expect);
+
+  $o = new SomeModel($c);
+  $this-&gt;assertEqual($o-&gt;getData($test_parm), $test_array);
+
+  $rs-&gt;tally();
+  $c-&gt;tally();
+}
+</pre>
+
+<p class="docText">注意，这个例子 —— 就像你的代码那样 —— 必须在代码的某个地方引入模拟数据库连接对象。有很多方法可以做这件事情，而且你以前或许已经用过其中的一两种：全局变量、Singleton 类，或总是传递连接对象给查找方法。这段代码用的是一种混合近似法，在实例化的时候把连接传递给对象。(我个人的方法是用一个可选的连接参数，还有就是从一个 Factory 获取对象)</p>
+
+<p class="docText">让我们一步一步地来研究这个测试。</p>
+
+<p class="docText">第一个断言验证一个特定的类常量是否存在。测试的类方法以及测试用例本身都要用到这个常量。</p>
+
+<p class="docText">接下来的两行创建了 <tt>$c</tt> 和 <tt>$rs</tt> 变量，它们分别为模拟数据库连接和模拟结果集。当 Mock Objects 被实例化的时候，测试用例本身作为一个参数被传递给 Mock Objects。</p>
+
+<p class="docText">再下来的两行代码创建了用于保存测试要用到的值的变量。这里，我并没有花费太多的时间在创造性上面，而只是随便给出了一些与正确类型近似的值。(我没有用测试数据中的合适的值建立记录数目或记录的真正字段名的模型，我只是把它们一起放在一个数组或联合数组中，然后用这些简单的值来进行测试。)在大多数情况下，你只需要验证你的测试代码是否返回了预期值 —— 也就是指你放在服务程序中的那个值。(当你进行综合测试的时候，你可以围绕真正的返回值结构的细节进行更多具体的测试)有的时候，我会给测试数据增加一些随机值，尤其是当我在测试代码中实现了某种缓存机制，而我又想验证缓存是否被清空了的时候。</p>
+
+<p class="docText">接着的一行，<tt>$rs-&gt;SetReturnValue('GetArray', $test_array);</tt>，通知模拟结果集，任何时候，只要调用它的 <tt>getArray()</tt> 方法，就返回 <tt>$test_array</tt>。紧接着就告诉模拟对象，期望 <tt>getArray()</tt> 方法在测试代码中只调用一次。<tt>$c-&gt;SetReturnReference('execute', $rs);</tt> 这一行告诉模拟数据库连接对象，如果调用 <tt>execute()</tt> 方法，就返回模拟结果集。</p>
+
+<p class="docText">Mock Objects 真正发挥作用的地方是用在模拟失败的情形中。(就是你的应用程序如何适当地处理数据库返回一个错误，而不是预期中的结果集那样的情况？)SimpleTest 使用 <tt>Mock::generate()</tt> 静态方法来创建一个 Mock Object 类定义。<tt>generate()</tt> 方法接受你想模拟的类名，并生成模拟类的 PHP 代码。然后你就可以用 <tt>$mock =&amp; new MockOriginalClass($this)</tt> 在测试用例中创建 Mock Objects 了。其中，<tt>$this</tt> 就是测试用例本身。</p>
+
+
+<h4 class="docSection2Title">Web 测试</h4>
+
+<p class="docText">SimpleTest 包含一个 <tt>WebTestCase</tt> 类，与 <tt>jWebUnit</tt>(<a class="docLink" target="_blank" href="http://jwebunit.sourceforge.net/">http://jwebunit.sourceforge.net/</a>) 的作用类似。<tt>WebTestCase</tt> 在脚本中提供了一个浏览器，可以用来获取、验证和处理你的 PHP 程序的结果内容。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">WebTestCase</p>
+
+<p class="docNoteText">SimpleTest 的 <tt>WebTestCase</tt> 允许你就像用户和访客使用你的 PHP 脚本那样，通过 web 站点测试你 PHP 程序的最终结果。它是像 <a class="docLink" target="_blank" href="http://htmlunit.sourceforge.net/">http://htmlunit.sourceforge.net/</a> 的一个 web 测试框架的 PHP 实现。W<tt>ebTestCase</tt> 能够获取页面、跟踪链接、验证表单元素是否存在及其默认值，还可以提交表单、框架、HTTP 响应代码，等等。</p>
+
+</div>
+
+<p class="docText">你很容易就能实现像浏览主页面，点击“login”链接，检索表单，以及提交用户名和密码这样的动作。<tt>WebTestCase</tt> 的功能对于综合测试(你的最终的应用程序的测试)很有用，对于处理遗留代码也非常有用(为你重构旧的脚本的主要工作提供了一个测试工具，这些脚本很可能并没有它们自己的单元测试)。</p>
+
+<p class="docText">就让我们为在第 6 章 —— 模拟对象模式中开发的“遗留”web 应用程序建立一个 <tt>WebTestCase</tt>。当重构那个范例代码的时候，这个测试可以充当一个安全工具。</p>
+
+
+
+<h5 class="docSection3Title">我们的遗留程序</h5>
+
+<p class="docText">下面这段简单的脚本十分典型，并且在很多 PHP 程序中都可能存在。如果用户还没登录，这个页面就会产生一个登录表单，充当这个表单的表单处理器，在成功登录后显示不同的内容，并提供退出功能。</p>
+
+<p class="docText">下面就是用户还没登录时用来显示登录表单的代码：</p>
+
+<pre>
+&lt;html&gt;
+  &lt;body&gt;
+    &lt;form action=&quot;&lt;?php echo SELF; ?&gt;&quot;&gt;
+      Name:&lt;input type=&quot;text&quot; name=&quot;name&quot;&gt;
+      Password:&lt;input type=&quot;password&quot; name=&quot;passwd&quot;&gt;
+      &lt;input type=&quot;submit&quot; value=&quot;Login&quot;&gt;
+    &lt;/form&gt;
+  &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p class="docText">或者，如果用户成功登录，就会显示下面的内容：</p>
+
+<pre>
+&lt;html&gt;
+  &lt;head&gt;
+    &lt;script type=&quot;text/javascript&quot;&gt;
+      function logout() {
+        document.location =&quot;&lt;?php echo SELF; ?&gt;?clear&quot;;
+      }
+    &lt;/script&gt;
+  &lt;/head&gt;
+
+  &lt;body&gt;
+    Welcome &lt;?=$_SESSION['name']?&gt;
+    &lt;br&gt;Super secret member only content here.
+    &lt;button onClick=&quot;logout();&quot;&gt;Logout&lt;/button&gt;
+  &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p class="docText">再加上表单处理功能、会话启动和退出功能，最后，整个脚本如下所示：</p>
+
+<pre>&lt;?php
+  <span class="docEmphStrong">session_start();
+
+  define('SELF', 'http://'.$_SERVER['SERVER_NAME'].$_SERVER['PHP_SELF']);
+
+  if (array_key_exists('name', $_REQUEST)
+      &amp;&amp; array_key_exists('passwd', $_REQUEST)
+      &amp;&amp; 'admin' == $_REQUEST['name']
+      &amp;&amp; 's3cr3t' == $_REQUEST['passwd']) {
+    $_SESSION['name'] = 'admin';
+    header('Location: '.SELF);
+  }
+
+  if (array_key_exists('clear', $_REQUEST)) {
+    unset($_SESSION['name']);
+  }
+
+  if (array_key_exists('name', $_SESSION)
+      &amp;&amp; $_SESSION['name']) { ?&gt;</span>
+    &lt;html&gt;
+      &lt;head&gt;
+        &lt;script type=&quot;text/javascript&quot;&gt;
+          function logout() {
+            document.location = &quot;&lt;?php echo SELF; ?&gt;?clear&quot;;
+          }
+        &lt;/script&gt;
+      &lt;/head&gt;
+
+      &lt;body&gt;
+        Welcome &lt;?=$_SESSION['name']?&gt;&lt;br&gt;
+        Super secret member only content here.
+        &lt;button onClick=&quot;logout();&quot;&gt;Logout&lt;/button&gt;
+      &lt;/body&gt;
+    &lt;/html&gt; &lt;?php
+  <span class="docEmphStrong">} else { ?&gt;</span>
+    &lt;html&gt;
+      &lt;body&gt;
+        &lt;form action=&quot;&lt;?php echo SELF; ?&gt;&quot;&gt;
+          Name:&lt;input type=&quot;text&quot; name=&quot;name&quot;&gt;
+          Password:&lt;input type=&quot;password&quot; name=&quot;passwd&quot;&gt;
+          &lt;input type=&quot;submit&quot; value=&quot;Login&quot;&gt;
+        &lt;/form&gt;
+      &lt;/body&gt;
+    &lt;/html&gt; <span class="docEmphStrong">&lt;?php
+  }</span>
+?&gt;
+</pre>
+
+<p class="docText">那么你怎样才能着手处理这个遗留程序来开始重构它呢？</p>
+
+<p class="docText">一种方法就是创建一个涵盖了你打算重构的程序的方方面面的 <tt>WebTestCase</tt>。这是从单元测试删除了的一步，而且更像是“验收测试”。在测试中模拟了最终用户如何被期望通过浏览器与程序进行交互。包含 SimpleTest 的 <tt>WebTestCase</tt>，并且把你的测试用例建立在 <tt>WebTestCase</tt> 类而非 <tt>UnitTestCase</tt> 类的基础上。另外，我还喜欢为我测试的页面所指向的 <tt>URL</tt> 定义一个常量。有了这些，你的测试脚本将包含如下这些代码：</p>
+
+<pre>
+&lt;?php
+  require_once 'simpletest/unit_tester.php';
+  require_once 'simpletest/reporter.php';
+  <span class="docEmphStrong">require_once 'simpletest/web_tester.php';</span>
+
+  <span class="docEmphStrong">define('TEST_URL', 'http://www.example.com/path/to/page.php');</span>
+
+  <span class="docEmphStrong">class PageWebTestCase extends WebTestCase {
+    function TestInitalFetchNoSecretContent() {
+      $this-&gt;assertTrue($this-&gt;get(TEST_URL));
+      $this-&gt;assertNoUnwantedPattern('/secret.*content/i');
+    }
+  }</span>
+?&gt;
+</pre>
+
+<p class="docText"><tt>$this-&gt;get()</tt> 方法将一个 <tt>URL</tt> 装入测试脚本的模拟浏览器。之后的断言，比如 <tt>assertNoUnwantedPattern()</tt>，默认地将页面内容装入这个浏览器。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">assertNoUnwantedPattern()</p>
+
+<p class="docNoteText">如果在测试的内容中出现了指定的 PCRE 正则表达式，<tt>assertNoUnwantedPattern()</tt> 断言就会失败。这允许你验证你不希望出现的内容是否确实消除了。</p>
+
+<p class="docNoteText">一种有效的用法就是用来验证页面中没有出现 PHP 错误(假设在程序的适当位置仍然使用了默认的错误处理器)。</p>
+
+</div>
+
+
+<p class="docText">运行这个测试，验证它可以通过。让我们用深一层的方法再对程序的特性做更多的检查。</p>
+
+<pre>
+class PageWebTestCase extends WebTestCase {
+  function TestInitalFetchNoSecretContent() { /*...*/ }
+
+  function TestInitalFetchContainsLoginForm() {
+    $this-&gt;assertTrue($this-&gt;get(TEST_URL));
+
+    $this-&gt;assertField('name');
+    $this-&gt;assertField('passwd');
+
+    $this-&gt;assertWantedPattern('/&lt;form.*&lt;input[^&gt;]*text[^&gt;]*'
+      .'name.*&lt;input[^&gt;]*password[^&gt;]*passwd/ims');
+  }
+</pre>
+
+<div class="docNote">
+
+<p class="docNoteTitle">assertField()</p>
+
+<p class="docNoteText"><tt>assertField()</tt> 断言检测页面中是否显示了一个特定的表单输入。这个断言需要一到三个参数：输入域的名字，以及可选的期望值和失败时要显示的消息。</p>
+
+</div>
+
+<p class="docText">这些测试建立了一个全新的到应用程序的连接，并且验证了它拥有一个登录表单，而且没有包含“保密内容”。</p>
+
+<p class="docText">接下来，我们继续验证登录表单是否可以正常工作，从一个失败的情况(不信任的提交)开始：</p>
+
+<pre>
+class PageWebTestCase extends WebTestCase {
+  function TestInitalFetchNoSecretContent() { /*...*/ }
+  function TestInitalFetchContainsLoginForm() { /*...*/ }
+
+  function TestBogusLoginFailure() {
+    $this-&gt;assertTrue($this-&gt;get(TEST_URL));
+
+    <span class="docEmphStrong">$this-&gt;setField('name', 'foo');
+    $this-&gt;setField('passwd', 'bar');
+    $this-&gt;clickSubmit('Login');</span>
+
+    $this-&gt;assertNoUnwantedPattern('/secret.*content/i');
+    $this-&gt;assertWantedPattern('/&lt;form.*&lt;input[^&gt;]*text[^&gt;]*'
+      .'name.*&lt;input[^&gt;]*password[^&gt;]*passwd/ims');
+  }
+}
+</pre>
+
+<p class="docText"><tt>WebTestCase::setField()</tt> 允许你填充表单元素的值。<tt>WebTestCase::clickSubmit()</tt> 让你可以提交表单，执行一个表单所指定的 HTTP <tt>GET</tt> 或 <tt>POST</tt> 操作。提交表单之后，测试验证登录表单是否重新显示了。</p>
+
+<p class="docText">下一步，测试登录成功的情况：</p>
+
+<pre>
+class PageWebTestCase extends WebTestCase {
+  function TestInitalFetchNoSecretContent() { /*...*/ }
+  function TestInitalFetchContainsLoginForm() { /*...*/ }
+  function TestBogusLoginFailure() { /*...*/ }
+
+  function TestSucessfulLogin() {
+    $this-&gt;assertTrue($this-&gt;get(TEST_URL));
+
+    $this-&gt;setField('name','admin');
+    $this-&gt;setField('passwd','s3cr3t');
+    $this-&gt;clickSubmit('Login');
+
+    <span class="docEmphStrong">$this-&gt;assertWantedPattern('/welcome\s+admin/i');
+    $this-&gt;assertWantedPattern('/secret.*content/i');
+    $this-&gt;assertNoUnwantedPattern('/&lt;form.*&lt;input[^&gt;]*text[^&gt;]*'
+      .'name.*&lt;input[^&gt;]*password[^&gt;]*passwd/ims');</span>
+  }
+}
+</pre>
+
+<p class="docText">这个测试用例验证发送了正确的信息之后，“保密内容”显示了，而且登录表单也不会再出现了。</p>
+
+<p class="docText">你也可以验证新的浏览器对象不包含有效的信息，这说明你用了会话来缓存登录信息。从本质上来说，SimpleTest 为每个测试方法都创建了一个新的浏览器实例，因此，其它的测试或接下来的方法应该创建一个新的会话，并因此会回到登录表单。</p>
+
+<pre>
+class PageWebTestCase extends WebTestCase {
+  function TestInitalFetchNoSecretContent() { /*...*/ }
+  function TestInitalFetchContainsLoginForm() { /*...*/ }
+  function TestBogusLoginFailure() { /*...*/ }
+  function TestSucessfulLogin() { /*...*/ }
+
+  function TestNewBroswerDoesNotCarrySession() {
+    $this-&gt;assertTrue($this-&gt;get(TEST_URL));
+
+    $this-&gt;assertField('name');
+    $this-&gt;assertField('passwd');
+
+    $this-&gt;assertWantedPattern('/&lt;form.*&lt;input[^&gt;]*text[^&gt;]*'
+      .'name.*&lt;input[^&gt;]*password[^&gt;]*passwd/ims');
+  }
+}
+</pre>
+
+<p class="docText">最后，你还可以测试“退出”(logout)功能。</p>
+
+<pre>
+class PageWebTestCase extends WebTestCase {
+  function TestInitalFetchNoSecretContent() { /*...*/ }
+  function TestInitalFetchContainsLoginForm() { /*...*/ }
+  function TestBogusLoginFailure() { /*...*/ }
+  function TestSucessfulLogin() { /*...*/ }
+  function TestNewBroswerDoesNotCarrySession() { /*...*/ }
+
+  function TestLogoutWorks() {
+    $this-&gt;assertTrue($this-&gt;get(TEST_URL));
+
+    $this-&gt;setField('name','admin');
+    $this-&gt;setField('passwd','secret');
+    $this-&gt;clickSubmit('Login');
+
+    $this-&gt;assertWantedPattern('/welcome\s+admin/i');
+    $this-&gt;assertWantedPattern('/secret.*content/i');
+
+    $this-&gt;assertTrue($this-&gt;get(TEST_URL.'?clear'));
+    $this-&gt;assertNoUnwantedPattern('/secret.*content/i');
+    $this-&gt;assertWantedPattern('/&lt;form.*&lt;input[^&gt;]*text[^&gt;]*'
+      .'name.*&lt;input[^&gt;]*password[^&gt;]*passwd/ims');
+  }
+}
+</pre>
+
+<p class="docText">通过为程序建立一个合适的 <tt>WebTestCase</tt>，你就能够重构这个程序，并可以保证得到相同的结果，这正是第 6 章所执行的测试的最终结果。</p>
+
+
+<h4 class="docSection2Title">部分模拟对象</h4>
+
+<p class="docText">为了使用 Mock Objects，你必须确保在最少修改的情况下，把 Mock Object 注入你的代码。如果你习惯了用 <tt>new</tt> 操作符在你的代码中创建对象，这可能会有些问题。</p>
+
+<p class="docText">你能够进行的一个最简单的重构就是改为调用一个内部 Factory，这个工厂返回最新创建的实例。然后，你就可以使用 Partial Mock Object 技术，用一个返回 Mock Object 的替代方法来代替你的目标代码的内部 Factory。这样做允许你在不能把一个对象放到代码流程的地方，或在测试你的所有的实际代码的情况下，注入对象的一个实例。</p>
+
+<p class="docText">接下来的一系列代码范例显示了一个简单的例子，在这个例子中你可能会发现这个技巧非常有用。这个例子使用第 2 章 —— 工厂方法模式的 <tt>Color</tt> 类，可能太简单了一点，但是它却涵盖了所有的概念；希望你更够把这个技术用到你自己的工作当中。</p>
+
+<p class="docText">下面这个简单的类用于文本操作，增加一个 <tt>&lt;span&gt;</tt> 标签来突出某些文本。</p>
+
+<pre>
+class TextWriter {
+  var $_buffer = '';
+
+  function addText($text) {
+    $this-&gt;_buffer .= $text;
+  }
+
+  function addHighlightedText($text) {
+    $color = new Color(255, 255, 0);
+
+    $this-&gt;_buffer .= '&lt;span style="background-color: '
+      .$color-&gt;getRgb().'"&gt;'.$text.'&lt;/span&gt;';
+  }
+
+  function render() {
+    $ret = $this-&gt;_buffer;
+    $this-&gt;_buffer = '';
+    return $ret;
+  }
+}
+</pre>
+
+<p class="docText">下面这个测试用例显示了这个类用在实际中的一个简单的例子：</p>
+
+<pre>
+class TestTextWriter extends UnitTestCase {
+  // ...
+
+  function TestSimpleText() {
+    $o =&amp; new TextWriter;
+    $test_string = 'this is some text';
+    $o-&gt;addText($test_string);
+
+    $this-&gt;assertEqual($test_string, $o-&gt;render());
+    $this-&gt;assertEqual('',$o-&gt;render());
+  }
+
+  function TestHighlightNoColorChange() {
+    $o =&amp; new TextWriter;
+    $o-&gt;addText('This is a string with a ');
+    $o-&gt;addHighlightedText('yellow');
+    $o-&gt;addText(' highlight');
+
+    $this-&gt;assertWantedPattern(
+      '~string.*&lt;span.*background.*#FFFF00.*yellow&lt;/span&gt;.*highlight~i',
+      $o-&gt;render()
+    );
+  }
+}
+</pre>
+
+<p class="docText">这个类能够正常工作，但它不是十分灵活。</p>
+
+<p class="docText">下一个需求就是允许改变突出显示文本的颜色，但仍然允许用黄色作为默认颜色。最初的尝试可能是象下面这样修改 <tt>addHighlightedText()</tt> 方法：</p>
+
+<pre>
+class TextWriter {
+  // ...
+
+  function addHighlightedText($text, $color = false) {
+    if (!(is_object($color)
+          &amp;&amp; method_exists($color, 'getRgb'))) {
+      $color = new Color(255, 255, 0);
+    }
+
+    $this-&gt;_buffer .= '&lt;span style="background-color: '
+      .$color-&gt;getRgb().'"&gt;'.$text.'&lt;/span&gt;';
+  }
+}
+</pre>
+
+<p class="docText">这段代码可以正常工作，但是有一个小小的缺陷 —— 如果你尝试在 <tt>$color</tt> 参数中传入一个 Mock Object ，测试会正确地运行，但因为 PHP4 默认传递的是对象的拷贝，所以 Mock Object 的 <tt>tally()</tt> 功能会被破坏。在这个例子中，你不能只改变 <tt>$color</tt> 参数为通过引用传递，因为通过引用传递的参数不能有默认值(而这正是我们需要的，因此违反了我们的需求)。</p>
+
+<p class="docText">解决这个问题的一个方法是让 <tt>addHighlightedText()</tt> 方法接受一个对象，该对象被包含在一个“封装器”，数组中。该数组包含了一个对象引用，可以按值传递，而且仍然包含对象引用。<tt>addHighlightedText()</tt> 方法可以像下面这样修改来使用这个习惯：</p>
+
+<pre>
+class TextWriter {
+  // ...
+
+  function addHighlightedText($text, $color = false) {
+    if (is_array($color)
+        &amp;&amp; is_object($color[0])
+        &amp;&amp; method_exists($color[0], 'getRgb')) {
+      $color =&amp; $color[0];
+    }
+
+    if (!(is_object($color)
+          &amp;&amp; method_exists($color, 'getRgb'))) {
+      $color = new Color(255, 255, 0);
+    }
+
+    $this-&gt;_buffer .= '&lt;span style="background-color: '
+      .$color-&gt;getRgb().'"&gt;'.$text.'&lt;/span&gt;';
+  }
+}
+</pre>
+
+<p class="docText">现在的测试和采用传递的那个一样，因为 Mock Object 是通过引用传递的，而且仍然还是可选的。</p>
+
+<pre>
+class TestTextWriter extends UnitTestCase {
+  // ...
+
+  function TestHighlightBlueWithMock() {
+    $o =&amp; new TextWriter;
+    $o-&gt;addText('This is a string with a ');
+
+    $test_color =&amp; new MockColor($this);
+    $test_color-&gt;setReturnValue('getRgb', '#0000FF');
+    $test_color-&gt;expectOnce('getRgb');
+
+    $o-&gt;addHighlightedText('blue', array(&amp;$test_color));
+    $o-&gt;addText(' highlight');
+
+    $this-&gt;assertWantedPattern(
+      '~string.*&lt;span.*background.*#0000FF.*blue&lt;/span&gt;.*highlight~i',
+      $o-&gt;render()
+    );
+
+    $test_color-&gt;tally();
+}
+}
+</pre>
+
+<p class="docText">你可能认为这样做是修改你的代码来允许测试，但是对于更加复杂的系统，你几乎总是需要确保你操作的是原来的对象，而不是一个拷贝，而这种编码方式正是一种解决之道。它允许在你代码中的任何地方使用通过引用机制传递的可选参数。</p>
+
+<p class="docText">但所有这些还是有点不那么令人满意，毕竟，增加到 <tt>addHighlightedText()</tt> 的很多行代码都只是用来处理这个可选的引用传递对象。另外，如果需要，仍然无法把默认颜色作为一个 Mock Object 进行测试。</p>
+
+<p class="docText">另外还有一种组织你代码的方法，就是把 <tt>CrayonBox</tt> <tt>Color</tt> Factory 和 <tt>TextWriter</tt> 类的一个内部 Factory Method 结合起来使用。这个方法减少了代码行的数量，并且解决了默认对象的测试问题。</p>
+
+<pre>
+class TextWriter {
+  // ...
+
+  function &amp;getNamedColor($color_name) {
+    return CrayonBox::getColor($color_name);
+  }
+
+  function addHighlightedText($text, $color_name = 'yellow') {
+    $color =&amp; $this-&gt;getNamedColor($color_name);
+
+    $this-&gt;_buffer .= '&lt;span style="background-color: '
+      .$color-&gt;getRgb().'"&gt;'.$text.'&lt;/span&gt;';
+  }
+}
+</pre>
+
+<p class="docText">这段代码引入了 <tt>protected</tt> 工厂方法 <tt>getNamedColor()</tt>，它通过引用返回一个由 <tt>CrayonBox</tt> Factory 创建的 <tt>Color</tt> 对象。现在，<tt>addHighlightedText()</tt> 的第二个可选参数是 <tt>$color_name</tt>，这是一个字符串，而且可以很容易按值传递。</p>
+
+<p class="docText">让我们看看测试这个类的“传统”做法：手工编写一个 <tt>TextWriter</tt> 子类，它允许你用返回一个 Mock Object 的代码来代替 <tt>getNamedColor()</tt> 方法。这样的一个子类看起来可能像：</p>
+
+<pre>
+class TextWriterWithMockFactory extends TextWriter {
+  var $_test_color;
+
+  function setColor(&amp;$color) {
+    $this-&gt;_test_color =&amp; $color;
+  }
+
+  function &amp;getNamedColor($color = '') {
+    if ($this-&gt;_test_color) {
+      return $this-&gt;_test_color;
+    } else {
+      return parent::getNamedColor($color);
+    }
+  }
+}
+</pre>
+
+<p class="docText">使用这个 <tt>TextWritereWithMockFactory</tt> 类的测试如下所示：</p>
+
+<pre>
+class TestTextWriter extends UnitTestCase {
+  //...
+
+  function TestHandCodedParticalMock() {
+    $col =&amp; new MockColor($this);
+    $col-&gt;setReturnValue('getRgb', '#00FF00');
+    $col-&gt;expectOnce('getRgb');
+
+    $tw =&amp; new TextWriterWithMockFactory;
+    $tw-&gt;setColor($col);
+    $tw-&gt;addText('This is a string with a ');
+    $tw-&gt;addHighlightedText4('lime', 'lime');
+    $tw-&gt;addText(' highlight');
+
+    $this-&gt;assertWantedPattern(
+      '~string.*&lt;span.*background.*#00FF00.*lime&lt;/span&gt;.*highlight~i',
+      $tw-&gt;render()
+    );
+
+    $col-&gt;tally();
+  }
+}
+</pre>
+
+<p class="docText">幸运的是，与 <tt>Mock::generate()</tt> 能够节省你为测试手工编写 Mock Objects 的时间类似，你也可以用 <tt>Mock::generatePartial()</tt> 产生一个你的类的“部分” Mock Object，它可以像上面的手工编码的例子那样，“打破”所选择的方法。通过创建一个 <tt>TextWriter</tt> 类的 Partial Mock Object，并用你自己的返回 Mock Objects 的方法替换 <tt>getNamedColor()</tt> 方法，你就能够测试 <tt>TextWriter</tt> 代码。结果的测试如下：</p>
+
+<pre>
+class TestTextWriter extends UnitTestCase {
+  // ...
+
+  function TestHighlightWithFactoryMethodMocked() {
+    Mock::generatePartial('TextWriter',
+                          'MockTextWriterNamedColor',
+                          array('getNamedColor'));
+
+    $col =&amp; new MockColor($this);
+    $col-&gt;setReturnValue('getRgb', '#00FF00');
+    $col-&gt;expectOnce('getRgb');
+
+    $tw =&amp; new MockTextWriterNamedColor($this);
+    $tw-&gt;setReturnReference('getNamedColor', $col);
+    $tw-&gt;expectOnce('getNamedColor', array('lime'));
+    $tw-&gt;addText('This is a string with a ');
+    $tw-&gt;addHighlightedText('lime', 'lime');
+    $tw-&gt;addText(' highlight');
+
+    $this-&gt;assertWantedPattern(
+      '~string.*&lt;span.*background.*#00FF00.*lime&lt;/span&gt;.*highlight~i',
+      $tw-&gt;render()
+    );
+
+    $tw-&gt;tally();
+    $col-&gt;tally();
+  }
+}
+</pre>
+
+<p class="docText">内部 Factory Methods 是降低你代码复杂性的一个非常强大的工具，它可以为你的代码增加灵活性，并且允许使用 Partial Mock Object 技术进行详细的测试。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,855 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第六章 The MockObject Pattern —— 模拟对象模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第六章 The MockObject Pattern —— 模拟对象模式</h2>
+
+<p class="docText">面向对象编程之所以丰富多彩，部分源于对象之间的互连和交互。一个单一的对象就能封装一个复杂的子系统，使那些复杂的操作就如调用少数方法一样简单。(无所不在的数据库连接就是一个这样的对象。)</p>
+
+<p class="docText">但是，经常地，对象之间的交互是如此复杂，以致你需要面对“先有鸡还是先有蛋”这样的伤脑筋的问题：如何开发并测试一个新的对象，它依赖许多其它对象的创建，或在一些情况下，比如重建整个数据库，很难实现。</p>
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">如何轻松地分离并测试一段依赖其它对象和资源的代码？如何重建一个或更多的对象或应用程序状态来验证你的代码可以正常运行？</p>
+
+
+<h3 class="docSection1Title">解决方案</h3>
+
+<p class="docText">当在开发环境中(或产品运行平台的仿真系统中)测试一个对象很难或非常昂贵的时候，可以使用 MockObject 来模拟它的行为。MockObject 与它代表的真实对象有完全相同的接口，但却提供了预编响应，跟踪方法调用，及验证调用次序。</p>
+
+<p class="docText">MockObjects 是测试世界的“特种部队”。经过秘密地训练，它们渗透目标代码，模拟并监视通信模式，回报结果。MockObjects 有助于查找和消除漏洞，并能支持更通常的标准应用程序测试集的“维和”操作。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">The ServerStub</p>
+
+<p class="docNoteText">伪对象模式是另一种测试模式 ServerStub 的扩展。ServerStub 模式替代一个资源并返回其方法所调用的相应值。当其参与指定次序的方法的调用时 ServerStub 就成了伪对象。</p>
+
+</div>
+
+
+<div class="docNote">
+
+<p class="docNoteTitle">其并非是一个设计模式</p>
+
+<p class="docNoteText">本章与其他章不同，因为伪对象是一个测试模式而不是设计模式。这类似于一个附加的章节，但对它的使用 确实很值得你纳入到编码进程中。另一个不同是我们不再关注这个模式如何编码之类的基础问题，而是强调如何在 SimpleTest 中使用伪对象。</p>
+
+</div>
+
+<p class="docText">本章首先介绍了一个非常简单的例子，它示范了 SimpleTest MockObjects 的基本结构。然后展示了如何使用 MockObjects 帮助重构遗留代码和测试新的解决方法。</p>
+
+
+<h3 class="docSection1Title">范例代码</h3>
+
+<p class="docText">MockObject 是一个使测试代码更加简单的替代对象。例如，不使用一个真正的数据库连接 —— 因为一些原因，可能是不切实际的 —— 你可以创建一个 MockObject 来模拟它。在实践中，这意味着 MockObject 需要提供与它代表的代码完全相同的 API。</p>
+
+<p class="docText">让我们创建一个 MockObject 来代替一个简单的叫做 <tt>Accumulator</tt> 的类，它用于对数字求和。以下是原始的 <tt>Accumulator</tt>：</p>
+
+<pre>
+// PHP4
+class Accumulator {
+  var $total = 0;
+
+  function add($item) {
+    $this-&gt;total += $item;
+  }
+
+  function total() {
+    return $this-&gt;total;
+  }
+}
+</pre>
+
+<p class="docText"><tt>add()</tt> 累加实例变量 <tt>$total</tt> 的值，<tt>total()</tt> 返回目前累加的值。<tt>Accumulator</tt> 的简单用法如下所示(下面的代码被编写为一个函数，但也可以编写为一个类)。</p>
+
+<pre>
+function calc_total($items, &amp;$sum) {
+  foreach ($items as $item) {
+    $sum-&gt;add($item);
+  }
+}
+
+function calc_tax(&amp;$amount, $rate = 0.07) {
+  return round($amount-&gt;total() * $rate, 2);
+}
+</pre>
+
+<p class="docText">第一个函数，<tt>calc_total()</tt>，用 <tt>Accumulator</tt> 求列表中值的和，很容易测试：</p>
+
+<pre>
+class MockObjectTestCase extends UnitTestCase {
+  function testCalcTotal() {
+    $sum =&amp; new Accumulator;
+
+    calc_total(array(1, 2, 3), $sum);
+    $this-&gt;assertEqual(6, $sum-&gt;total());
+  }
+}
+</pre>
+
+<p class="docText">我们继续第二个用例。假设初始化真实的 <tt>Accumulator</tt> 代价很大。如果一个简单的对象可以代替 <tt>Accumulator</tt>，并返回一组响应给环境代码将会非常理想。使用 SimpleTest，你可以用以下代码创建一个模拟 <tt>Accumulator</tt>：</p>
+
+<pre>
+Mock::generate('Accumulator');
+
+class MockObjectTestCase extends UnitTestCase {
+  // ...
+
+  function testCalcTax() {
+    $amount =&amp; new MockAccumulator($this);
+    $amount-&gt;setReturnValue('total', 200);
+
+    $this-&gt;assertEqual(14, calc_tax($amount));
+  }
+}
+</pre>
+
+<p class="docText">为了使用 MockObject，代表性的方法是亲自为它地创建一个新类(并不要求马上就做)。幸运的是，SimpleTest 包含一个简单的方法用于完成这项工作：<tt>Mock::generate()</tt> 方法。</p>
+
+<p class="docText">在上面的例子中，创建了一个叫做 <tt>MockAccumulator</tt> 的类来响应所有 <tt>Accumulator</tt> 类的方法。另外，<tt>MockAccumulator</tt> 还有其它方法用于操纵 MockObject 实例本身。<tt>setReturnValue()</tt> 就是一个这样的方法。给一个方法名和值，<tt>setReturnValue()</tt> 就可以改变 MockObject，当指定的方法被调用时，返回给定的值。所以，不管什么时候调用 <tt>total()</tt> 方法，<tt>$amount-&gt;setReturnValue('total', 200)</tt> 语句都返回 <tt>200</tt>。</p>
+
+<p class="docText">一旦完成了初始化，就可以把 <tt>MockAccumulator</tt> 类传递给 <tt>calc_tax()</tt> 函数来扮演一个真正的 <tt>Accumulator</tt> 对象。</p>
+
+<p class="docText">如果你止步于此 —— 用一个对象返回“固定的”响应给方法调用 —— 你就已经实现了 ServerStub 模式。但 MockObject 还可以进一步验证调用了哪些方法，调用了多少次，以及是按什么顺序调用的。</p>
+
+<p class="docText">下面就是一个验证对象的整个执行“流程”的例子：</p>
+
+<pre>
+class MockObjectTestCase extends UnitTestCase {
+  // ...
+
+  function testCalcTax() {
+    $amount =&amp; new MockAccumulator($this);
+    $amount-&gt;setReturnValue('total', 200);
+    <span class="docEmphStrong">$amount-&gt;expectOnce('total');</span>
+
+    $this-&gt;assertEqual(14, calc_tax($amount));
+
+    <span class="docEmphStrong">$amount-&gt;tally();</span>
+  }
+}
+</pre>
+
+<p class="docText">这里，<tt>expectOnce()</tt> 方法接受一个字符串，它包含了你希望被调用一次的方法名。<tt>tally()</tt> 是实际的检查，决定你的预期是否吻合。这里，如果 <tt>MockAccumulator::total()</tt> 没有被调用一次，而且仅有一次，测试就会失败。</p>
+
+<p class="docText">在许多地方，你都可以使用 MockObject 的这种“跟踪”特性。例如，如果你传递一个包含三个值的数组到 <tt>calc_total()</tt>，<tt>Accumulator::add()</tt> 也否也如预期那样调用三次呢？</p>
+
+<pre>
+class MockObjectTestCase extends UnitTestCase {
+  // ...
+
+  function testCalcTotalAgain() {
+    $sum =&amp; new MockAccumulator($this);
+    $sum-&gt;expectOnce('add');
+
+    calc_total(array(1, 2, 3), $sum);
+
+    $sum-&gt;tally();
+  }
+}
+</pre>
+
+<p class="docText">哎唷(Whoops)，怎么了？测试没有通过而是失败了。SimpleTest 错误信息描述如下：</p>
+
+<pre>
+MockObject PHP4 Unit Test
+1) Expected call count for [add] was [1] got [3] at line [51]
+    in testcalctotalagain
+    in mockobjecttestcase
+FAILURES!!!
+Test cases run: 1/1, Passes: 2, Failures: 1, Exceptions: 0
+</pre>
+
+<p class="docText">错误信息指出 <tt>add()</tt> 方法被调用了三次，而不是 <tt>expectOnce()</tt> 断言所要求的一次。这个测试不应使用 <tt>expectOnce()</tt>，而应使用 <tt>expectCallCount()</tt>。</p>
+
+<pre>
+class MockObjectTestCase extends UnitTestCase {
+  // ...
+
+  function testCalcTotalAgain() {
+    $sum =&amp; new MockAccumulator($this);
+    <span class="docEmphStrong">$sum-&gt;expectCallCount('add', 3);</span>
+
+    calc_total(array(1, 2, 3), $sum);
+
+    $sum-&gt;tally();
+  }
+}
+</pre>
+
+<p class="docText">MockObject 扮演了一个执行者的角色 —— 作为一个 SeverStub 提供合适的测试数据来响应方法调用 —— 和鉴定器的角色，验证对应该调用哪个方法的假设。</p>
+
+
+<h4 class="docSection2Title">一个遗留程序</h4>
+
+<p class="docText">下一个例子，我们使用 MockObject 来帮助重构一个遗留程序。考虑一个简单的脚本，它可以模仿你在很多 PHP 应用程序中所期望的各种行为：一个 PHP 页面，如果用户还没有登录就为用户生成一个登录表单；充当一个表单处理器；它能在成功登录后显示不同的内容并提供退出功能。</p>
+
+<p class="docText">我们来编写一个这样的页面。首先，如果用户还没登录就显示一个登录表单：</p>
+
+<pre>
+&lt;html&gt;
+  &lt;body&gt;
+    &lt;form method=&quot;post&quot;&gt;
+      Name:&lt;input type=&quot;text&quot; name=&quot;name&quot;&gt;
+      Password:&lt;input type=&quot;password&quot; name=&quot;passwd&quot;&gt;
+      &lt;input type=&quot;submit&quot; value=&quot;Login&quot;&gt;
+    &lt;/form&gt;
+  &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p class="docText">接着，如果用户已经登录就提供一些内容：</p>
+
+<pre>
+&lt;html&gt;
+  &lt;body&gt;
+    Welcome &lt;?php echo $_SESSION['name']; ?&gt;
+    &lt;br&gt;Super secret member only content here.
+    &lt;a href=&quot;&lt;?php echo SELF; ?&gt;?clear&quot;&gt;Logout&lt;/a&gt;
+  &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p class="docText">然后再增加表单处理、会话启动，以及退出的功能，于是整个脚本可能看起来像：</p>
+
+<pre>
+<span class="docEmphStrong">session_start();
+
+define('SELF',
+ 'http://'.$_SERVER['SERVER_NAME'].$_SERVER['PHP_SELF']);</span>
+
+<span class="docEmphStrong">if (array_key_exists('name', $_REQUEST)
+    &amp;&amp; array_key_exists('passwd', $_REQUEST)
+    &amp;&amp; 'admin' == $_REQUEST['name']
+    &amp;&amp; 'secret' == $_REQUEST['passwd']) {
+  $_SESSION['name'] = 'admin';
+  header('Location: '.SELF);
+}</span>
+
+<span class="docEmphStrong">if (array_key_exists('clear', $_REQUEST)) {
+  unset($_SESSION['name']);
+}</span>
+
+<span class="docEmphStrong">if (array_key_exists('name', $_SESSION)
+    &amp;&amp; $_SESSION['name']) { ?&gt;</span>
+  &lt;html&gt;
+    &lt;body&gt;
+      Welcome &lt;?=$_SESSION['name']?&gt;
+      &lt;br&gt;Super secret member only content here.
+      &lt;a href=&quot;&lt;?php echo SELF; ?&gt;?clear&quot;&gt;Logout&lt;/a&gt;
+    &lt;/body&gt;
+    &lt;/html&gt; &lt;?php
+<span class="docEmphStrong">} else { ?&gt;</span>
+  &lt;html&gt;
+  &lt;body&gt;
+  &lt;form method=&quot;post&quot;&gt;
+  Name:&lt;input type=&quot;text&quot; name=&quot;name&quot;&gt;
+  Password:&lt;input type=&quot;password&quot; name=&quot;passwd&quot;&gt;
+  &lt;input type=&quot;submit&quot; value=&quot;Login&quot;&gt;
+  &lt;/form&gt;
+  &lt;/body&gt;
+  &lt;/html&gt; &lt;?php
+<span class="docEmphStrong">}</span>
+</pre>
+
+<p class="docText">重构这个遗留程序的一个目标应该是创建一个“可测试的”应用程序。这个目标直接影响设计：如果你选择使用一些 PHP 的方便的特性 —— 如超全局变量 —— 为了便利性你牺牲了测试。</p>
+
+<p class="docText">例如，如果直接使用 <tt>$_SESSION</tt>，比方说，那么测试这样的代码的唯一方法是修改 <tt>$_SESSION</tt>。唉，如果你忘了把 <tt>$_SESSION</tt> 改回到一个已知状态，就会在测试之间造成干扰。</p>
+
+<p class="docText">这个问题的一个解决方法是把 <tt>$_SESSION</tt> 包装在另一个类中，然后传递所包装类的实例给任何需要访问 <tt>$_SESSION</tt> 的对象。如果你为测试创建了这个包装对象的一个 MockObject 版本，你就可以完全控制对象对方法调用的响应(充当了一个 ServerStub)，而且你还能验证它是如何被调用的(这正是 MockObject 的目的)。</p>
+
+<p class="docText">头脑中有了这些概念，我们来看一个用于 <tt>$_SESSION</tt> 超全局变量的包装器会是什么样子。</p>
+
+<pre>
+class Session {
+  function Session() {
+    $this-&gt;init();
+  }
+
+  function init() {
+    if (!isset($_SESSION)) {
+      if (headers_sent()) {
+        trigger_error('Session not started before creating session object');
+      } else {
+        session_start();
+      }
+    }
+  }
+
+  function isValid($key) {
+    return array_key_exists($key, $_SESSION);
+  }
+
+  function get($key) {
+    return (array_key_exists($key, $_SESSION))
+      ? $_SESSION[$key]
+      : null;
+  }
+
+  function set($key, $value) {
+    $_SESSION[$key] = $value;
+  }
+
+  function clear($key) {
+    unset($_SESSION[$key]);
+  }
+}
+</pre>
+
+<p class="docText"><tt>Session</tt> 是 <tt>$_SESSION</tt> 超全局变量的包装器。用于 <tt>Session</tt> 的测试和早先为 Registry 类(见第 5 章)开发的测试相似，但是却无任何通过引用获取或设置相应值的意图。</p>
+
+<p class="docText">你可能已经注意到构造函数调用了 <tt>Session::init()</tt> 方法。为什么不把这个方法作为构造函数本身的一部分呢？它被分离出来是为了你可以静态调用它，从而确保会话已经开始了。下面就是一个使用这个类的例子：</p>
+
+<pre>
+Session::init();
+
+$page =&amp; new PageDirector(new Session);
+</pre>
+
+<p class="docText">大多数介绍 MockObjects 测试的文献建议你亲自编写 MockObjects。如果你打算那样做，只需要提供足够通过测试的方法就可以了。例如，一个为 <tt>Session</tt> 类手工编码的 ServerStub 可能是这样的：</p>
+
+<pre>
+class MyMockSessionUser1 {
+  function isValid($key) {
+    return ('user_id' == $key) ? true : false;
+  }
+
+  function get($key) {
+    if ('user_id' == $key) {
+      return 1;
+    }
+  }
+}
+</pre>
+
+<p class="docText">幸运的是，你可以使用 SimpleTest 避免干这份容易引起错误的苦差。<tt>Mock::generate()</tt> 方法允许你创建一个类，你可以根据你的需要来实例化并进行动态配置。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">MockObject(模拟对象) 技术</p>
+
+<p class="docNoteText">SimpleTest 的方法只是众多使用 MockObjects 的方法其中之一。硬编码 MockObjects 是另一种方法(如上所示)。随着 PHP5 的出现，你还会看到利用 __call() 来实现一个 PHP MockObject 的方式。</p>
+
+</div>
+
+<p class="docText">以下是如何在 SimpleTest 生成的 MockObject 测试用例中重建 <tt>MyMockSessionUser1</tt>(如上所示)：</p>
+
+<pre>
+Mock::Generate('Session');
+
+class PageDirectorTestCase extends UnitTestCase {
+  function testSomethingWhichUsesSession() {
+    $session =&amp; new MockSession($this);
+    $session-&gt;setReturnValue('isValid', true);
+    $session-&gt;setReturnValue('get', 1);
+    // ...
+  }
+}
+</pre>
+
+<p class="docText">此外，你还可以设置希望调用何种方法以及调用多少次。你甚至可以验证某些方法根本不应该调用。</p>
+
+<p class="docText">下面是一个扩展的测试，用来创建和验证一些更加复杂的预期。</p>
+
+<pre>
+class PageDirectorTestCase extends UnitTestCase {
+  function testSomethingWhichUsesSession() {
+    $session =&amp; new MockSession($this);
+    $session-&gt;setReturnValue('isValid', true);
+    $session-&gt;setReturnValue('get', 1);
+    <span class="docEmphStrong">$session-&gt;expectOnce('isValid', array('user_id'));
+    $session-&gt;expectOnce('get', array('user_id'));
+    $session-&gt;expectNever('set');</span>
+
+    // the actual code which uses $session
+    <span class="docEmphStrong">$session-&gt;tally();</span>
+  }
+}
+</pre>
+
+<p class="docText">使用 MockObject 的原因很多，方法也是各种各样。但在继续讨论之前，我们把另外的一些类加入进来，得到一个工作环境。</p>
+
+<p class="docText">以下是重构遗留脚本中的下一个组件，用来验证用户信息是否正确的 <tt>UserLogin</tt> 类。</p>
+
+<pre>
+class UserLogin {
+  var $_valid=true;
+  var $_id;
+  var $_name;
+
+  function UserLogin($name) {
+    switch (strtolower($name)) {
+      case 'admin':
+        $this-&gt;_id = 1;
+        $this-&gt;_name = 'admin';
+        break;
+      default:
+        trigger_error(&quot;Bad user name '$name'&quot;);
+        $this-&gt;_valid = false;
+    }
+  }
+
+  function name() {
+    if ($this-&gt;_valid) return $this-&gt;_name;
+  }
+
+  function Validate($user_name, $password) {
+    if ('admin' == strtolower($user_name)
+        &amp;&amp; 'secret' == $password) {
+      return true;
+    }
+    return false;
+  }
+}
+</pre>
+
+<p class="docText">(在实际的应用程序中，你应该按照如上所示的逻辑来查询相应的数据表。这种简单的，硬编码的类体现了实现 ServerStub 所编写的代码 —— 一个简单的类，按照你所需要的方式运行，但只在有限的环境下使用。)</p>
+
+<p class="docText">最后要创建的组件是 <tt>Response</tt>。为最终输出到浏览器，它必须处理累加 HTML 内容的任务，如果需要，也可以发送一个 HTTP 重定向。(你也可以执行其它 HTTP 头操作 —— 比如说，为了在一个成熟的实现中实现缓存的目的，但这里使用的是简单的代码，是为了一个有针对性的，易于理解的例子。)</p>
+
+<pre>
+class Response {
+  var $_head = '';
+  var $_body = '';
+
+  function addHead($content) {
+    $this-&gt;_head .= $content;
+  }
+
+  function addBody($content) {
+    $this-&gt;_body .= $content;
+  }
+
+  function display() {
+    echo $this-&gt;fetch();
+  }
+
+  function fetch() {
+    return '&lt;html&gt;'
+      .'&lt;head&gt;'.$this-&gt;_head.'&lt;/head&gt;'
+      .'&lt;body&gt;'.$this-&gt;_body.'&lt;/body&gt;'
+      .'&lt;/html&gt;';
+  }
+
+  function redirect($url, $exit = true) {
+    header('Location: '.$url);
+    if ($exit) exit;
+  }
+}
+</pre>
+
+<p class="docText">有了这些构件，该是使用这些新开发的，经过测试的组件建立一个页面的时候了。我们装配一个适当命名的 <tt>final PageDirector</tt> 类，来协调页面的所有动作。<tt>PageDirector</tt> 有一个非常简单的 API：你只需实例化，并调用它的 <tt>run()</tt> 方法。</p>
+
+<p class="docText">于是，运行这个新的应用程序的“引导(bootstrap)”文件如下：</p>
+
+<pre>
+&lt;?php
+  require_once 'classes.inc.php';
+
+  define('SELF', 'http://www.example.com/path/to/page.php');
+
+  $page =&amp; new PageDirector(new Session, new Response);
+  page-&gt;run();
+?&gt;
+</pre>
+
+<p class="docText">这个文件包含了必需的类定义，并定义了一个代表自身的常量，创建了一个 <tt>PageDirector</tt> 类(传递相关的 <tt>Session</tt> 和 <tt>Response</tt> 类的实例作为构造函数的一部分)的实例，然后执行 <tt>PageDirector::run()</tt> 方法。</p>
+
+<p class="docText">现在，我们建立一些测试用例来详细说明重构后的应用程序的预期行为。</p>
+
+<pre>
+require_once 'simpletest/unit_tester.php';
+require_once 'simpletest/reporter.php';
+<span class="docEmphStrong">require_once 'simpletest/mock_objects.php';</span>
+require_once 'simpletest/web_tester.php';
+require_once 'classes.inc.php';
+
+Session::init();
+
+class PageWebTestCase extends WebTestCase { /*...*/ }
+class ResponseTestCase extends UnitTestCase { /*...*/ }
+class UserLoginTestCase extends UnitTestCase { /*...*/ }
+class SessionTestCase extends UnitTestCase { /*...*/ }
+class PageDirectorTestCase extends UnitTestCase { /*...*/ }
+
+$test = new GroupTest('Application PHP4 Unit Test');
+$test-&gt;addTestCase(new PageWebTestCase);
+$test-&gt;addTestCase(new ResponseTestCase);
+$test-&gt;addTestCase(new UserLoginTestCase);
+$test-&gt;addTestCase(new SessionTestCase);
+$test-&gt;addTestCase(new PageDirectorTestCase);
+</pre>
+
+<p class="docText">这个代码块或多或少展示了一个典型的应用程序测试文件的样子。它一开始就包含了 SimpleTest 文件，也包含了用模拟对象进行测试的 <span class="docEmphasis">mock_object.php</span> 文件。跟着，目标类被包含进来，然后 <tt>Session::init()</tt> 方法被调用来启动会话。</p>
+
+<p class="docText">紧接着是所有的测试用例，从“安全带”开始，<tt>WebTestCase</tt> 确保整个应用程序按照需要运行，接着是单独的用于新设计的类(尽管没有在本章作详细介绍)的单元测试。最后是 <tt>PageDirectorTestCase</tt>，接下来将会讨论它。</p>
+
+<p class="docText"><tt>PageDirector</tt> 类的核心职责是协调 <tt>Session</tt> 和 <tt>Response</tt> 对象，产生页面的最终输出。</p>
+
+<pre>
+Mock::Generate('Session');
+Mock::Generate('Response');
+
+define('SELF', 'testvalue');
+
+class PageDirectorTestCase extends UnitTestCase {
+  // ...
+}
+</pre>
+
+<p class="docText">在这段代码的一开始，<tt>Mock::generate()</tt> 创建了 MockObject 类定义，并定义了一个在这个测试后面要用到的常量。</p>
+
+<p class="docText">假设 <tt>Session</tt> 和 <tt>Response</tt> 的测试已经有了，下一步是创建测试，用 <tt>MockSession</tt> 来模拟所需的 <tt>Session</tt> 的状态。MockObject 的设置与一开始显示的例子相似。</p>
+
+<p class="docText">因为 <tt>PageDirector::run()</tt> 方法会回显内容，你可以使用输出缓存来捕捉内容，并使用断言来验证它。</p>
+
+<pre>
+class PageDirectorTestCase extends UnitTestCase {
+  // ...
+
+  function TestLoggedOutContent() {
+    <span class="docEmphStrong">$session =&amp; new MockSession($this);
+    $session-&gt;setReturnValue('get', null, array('user_name'));
+    $session-&gt;expectOnce('get', array('user_name'));</span>
+
+    $page =&amp; new PageDirector($session, new Response);
+
+    ob_start();
+    $page-&gt;run();
+    $result = ob_get_clean();
+
+    $this-&gt;assertNoUnwantedPattern('/secret.*content/i', $result);
+    $this-&gt;assertWantedPattern('/&lt;form.*&lt;input[^&gt;]*text[^&gt;]*'
+      .'name.*&lt;input[^&gt;]*password[^&gt;]*passwd/ims'
+      , $result);
+
+    <span class="docEmphStrong">$session-&gt;tally();</span>
+  }
+}
+</pre>
+
+<p class="docText">这段代码说明了在 SimpleTest 中使用 MockObject 的基本要点。<tt>$session = &amp;new MockSession($this);</tt> 这一行创建了模拟对象。然后你可以使用从 <tt>SimpleStub</tt>(<a class="docLink" target="_blank" href="http://simpletest.sf.net/SimpleTest/MockObjects/SimpleStub.html#sec-methodsummary">http://simpletest.sf.net/SimpleTest/MockObjects/SimpleStub.html#sec-methodsummary</a>) 类继承的方法来创建你所希望从这个对象返回的响应(就像在测试代码中所做的那样)。接着，实例化 <tt>PageDirector</tt> 类，并用 <tt>MockSession</tt> 代替正式使用的类来证明代码是符合预期的。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">setReturnValue()</p>
+
+<p class="docNoteText">通过指定调用 MockObject 的特定方法时的返回值，<tt>setReturnValue()</tt> 方法让 MockObject 以一个“替身”的身份参与代码的执行。还有几个这种方法的变体：其中一个用于指定顺次返回一系列不同的值，还有一个用于指定按引用代替按值的方式返回结果。</p>
+
+</div>
+
+<div class="docNote">
+
+<p class="docNoteTitle">expectOnce()</p>
+
+<p class="docNoteText">通过设置那个方法将会被调用，调用多少次这样的假设，<tt>expectOnce()</tt> 方法允许你的 MockObject 充当测试代码的一个“鉴定器”。当你调用 MockObject 的 <tt>tally()</tt> 方法的时候，这些期望值就会在测试中报告出来。</p>
+
+</div>
+
+<pre>
+class PageDirector {
+  var $session;
+  var $response;
+
+  function PageDirector(&amp;$session, &amp;$response) {
+    $this-&gt;session =&amp; $session;
+    $this-&gt;response =&amp; $response;
+  }
+}
+</pre>
+
+<p class="docText">因为 <tt>PageDirector</tt> 类认为自己正处于一个真实的应用程序，而不是一个测试用例，因此它回显结果页面到浏览器。既然在测试期间你并不想要这种行为，在测试代码的执行期间，你可以使用 PHP 的输出缓存(<a class="docLink" target="_blank" href="http://php.net/outcontrol">http://php.net/outcontrol</a>)特性来捕捉将要发送到浏览器的内容。</p>
+
+<pre>
+class PageDirector {
+  // ...
+
+  function run() {
+    if (!$this-&gt;isLoggedIn()) {
+      $this-&gt;showLogin();
+    }
+    $this-&gt;response-&gt;display();
+  }
+
+  function isLoggedIn() {
+    return ($this-&gt;session-&gt;get('user_name')) ? true : false;
+  }
+
+  function showLogin() {
+    $this-&gt;response-&gt;addBody('&lt;form method=&quot;post&quot;&gt;');
+    $this-&gt;response-&gt;addBody('Name:&lt;input type=&quot;text&quot; name=&quot;name&quot;&gt;');
+    $this-&gt;response-&gt;addBody(&quot;\n&quot;);
+    $this-&gt;response-&gt;addBody('Password:&lt;input type=&quot;password&quot; name=&quot;passwd&quot;&gt;');
+    $this-&gt;response-&gt;addBody(&quot;\n&quot;);
+    $this-&gt;response-&gt;addBody('&lt;input type=&quot;submit&quot; value=&quot;Login&quot;&gt;');
+    $this-&gt;response-&gt;addBody('&lt;/form&gt;');
+  }
+}
+</pre>
+
+<p class="docText">如同应用程序代码一样，测试也可以进行重构。在本例中，你可以看到需要多次使用输出缓存的技巧，所以应该使用“抽取方法”重构技术来简化测试。(回想一下，以“<tt>test</tt>”打头的方法是测试程序组自动运行的方法；任何其它方法可以创建来使测试更加简单。)</p>
+
+<p class="docText">下面的代码块演示了输出缓存被重构到 <tt>runPage</tt> 方法的结果，另一个当用户登录后生成的输出的测试也可以这样重构。</p>
+
+<pre>
+class PageDirectorTestCase extends UnitTestCase {
+  // ...
+
+  function TestLoggedOutContent() {
+    $session =&amp; new MockSession($this);
+    $session-&gt;setReturnValue('get', null, array('user_name'));
+    $session-&gt;expectOnce('get', array('user_name'));
+
+    $page =&amp; new PageDirector($session, new Response);
+
+    <span class="docEmphStrong">$result = $this-&gt;runPage($page);</span>
+    $this-&gt;assertNoUnwantedPattern('/secret.*content/i', $result);
+    $this-&gt;assertWantedPattern('/&lt;form.*&lt;input[^&gt;]*text[^&gt;]*'
+      .'name.*&lt;input[^&gt;]*password[^&gt;]*passwd/ims'
+      , $result);
+
+    $session-&gt;tally();
+  }
+
+  function TestLoggedInContent() {
+    $session =&amp; new MockSession($this);
+    $session-&gt;setReturnValue('get', 'admin', array('user_name'));
+    $session-&gt;expectAtLeastOnce('get');
+
+    $page =&amp; new PageDirector($session, new Response);
+
+    <span class="docEmphStrong">$result = $this-&gt;runPage($page);</span>
+    $this-&gt;assertWantedPattern('/secret.*content/i', $result);
+    $this-&gt;assertNoUnwantedPattern('/&lt;form.*&lt;input[^&gt;]*text[^&gt;]*'
+      . 'name.*&lt;input[^&gt;]*password[^&gt;]*passwd/ims'
+      , $result);
+
+    $session-&gt;tally();
+  }
+
+  <span class="docEmphStrong">function runPage(&amp;$page) {
+    ob_start();
+    $page-&gt;run();
+    return ob_get_clean();
+  }</span>
+}
+</pre>
+
+<p class="docText">接下来，给 <tt>PageDirector::run()</tt> 方法增加一个条件检测来判断用户是否已经登录了，然后根据判断的结果决定显示什么模板。</p>
+
+<pre>
+class PageDirector {
+  // ...
+
+  function run() {
+    <span class="docEmphStrong">if ($this-&gt;isLoggedIn()) {
+      $this-&gt;showPage(new UserLogin($this-&gt;session-&gt;get('user_name')));</span>
+    } else {
+      $this-&gt;showLogin();
+    }
+    $this-&gt;response-&gt;display();
+  }
+
+  function showPage(&amp;$user) {
+    $vars = array('name' =&gt; $user-&gt;name(),
+                  'self' =&gt; SELF);
+    $this-&gt;response-&gt;addBodyTemplate('page.tpl', $vars);
+  }
+}
+</pre>
+
+<p class="docText">page.tpl 可能看起来像这个样子：</p>
+
+<pre>
+Welcome &lt;?php echo $name; ?&gt;
+&lt;br&gt;Super secret member only content here.
+&lt;a href=&quot;&lt;?php echo $self; ?&gt;?clear&quot;&gt;Logout&lt;/a&gt;
+</pre>
+
+<p class="docText">在这里，<tt>MockSession</tt> 充当了一个 ServerStub 来控制决定是否用户已经登录的条件。它还行使一个鉴定器的职责，决定这个信息是否以如下两种方式正确地使用：一个是通过定义预期值并通过 <tt>tally()</tt> 验证它们是否明确地使用，另一个是间接地，通过基于 ServerStub 返回的值生成正确的输出。</p>
+
+<p class="docText">为了继续重构这段代码，下一步要跳到表单处理。需要执行两个动作：清除已经登录的用户和验证登录页面提交的用户名和密码来验证用户身份。</p>
+
+<p class="docText">我们从退出功能开始：</p>
+
+<pre>
+class PageDirectorTestCase extends UnitTestCase {
+  // ...
+
+  function TestClearLoginFunctionality() {
+    $_REQUEST['clear'] = null;
+
+    $session =&amp; new MockSession($this);
+    $session-&gt;expectOnce('clear', array('user_name'));
+    $session-&gt;setReturnValue('get', null, array('user_name'));
+    $session-&gt;expectAtLeastOnce('get');
+
+    <span class="docEmphStrong">$response = new MockResponse($this);
+    $response-&gt;expectOnce('redirect', array(SELF));</span>
+
+    $page =&amp; new PageDirector($session, $response);
+    $this-&gt;assertEqual('', $this-&gt;runPage($page));
+
+    $response-&gt;tally();
+    $session-&gt;tally();
+
+    unset($_REQUEST['clear']);
+  }
+}
+</pre>
+
+<p class="docText">在这段代码中，模拟了 <tt>Response</tt> 对象；否则，一旦脚本在 <tt>Response::redirect()</tt> 方法中触及 <tt>exit()</tt> 调用，它就会停止执行。通过模拟 <tt>Response</tt>，你可以验证方法是否被调用过，以及传递了什么参数给方法，而且不会产生任何副作用 —— 结束脚本 —— 实际上发生了。</p>
+
+<p class="docText">下面是实现这个测试的代码；</p>
+
+<pre>
+class PageDirector {
+  // ...
+
+  function run() {
+    <span class="docEmphStrong">$this-&gt;processLogin();</span>
+    if ($this-&gt;isLoggedIn()) {
+      $this-&gt;showPage(new UserLogin($this-&gt;session-&gt;get('user_name')));
+    } else {
+      $this-&gt;showLogin();
+    }
+    $this-&gt;response-&gt;display();
+  }
+
+  <span class="docEmphStrong">function processLogin() {
+    if (array_key_exists('clear', $_REQUEST)) {
+      $this-&gt;session-&gt;clear('user_name');
+      $this-&gt;response-&gt;redirect(SELF);
+    }
+  }</span>
+}
+</pre>
+
+<p class="docText">最后是登录表单处理的测试：</p>
+
+<pre>
+class PageDirectorTestCase extends UnitTestCase {
+  // ...
+
+  function TestLoginFromRequest() {
+    $_REQUEST['name'] = 'admin';
+    $_REQUEST['passwd'] = 'secret';
+
+    $session =&amp; new MockSession($this);
+    $session-&gt;expectOnce('set', array('user_name', 'admin'));
+
+    $response = new MockResponse($this);
+    $response-&gt;expectOnce('redirect', array(SELF));
+
+    $page =&amp; new PageDirector($session, $response);
+    $this-&gt;assertEqual('', $this-&gt;runPage($page));
+
+    $response-&gt;tally();
+    $session-&gt;tally();
+
+    unset($_REQUEST['name']);
+    unset($_REQUEST['passwd']);
+  }
+}
+</pre>
+
+<p class="docText">下面是实现上面测试中指定的特性所需的代码：</p>
+
+<pre>
+class PageDirector {
+  // ...
+
+  function processLogin() {
+    if (array_key_exists('clear', $_REQUEST)) {
+      $this-&gt;session-&gt;clear('user_name');
+      $this-&gt;response-&gt;redirect(SELF);
+    }
+
+    <span class="docEmphStrong">if (array_key_exists('name', $_REQUEST)
+        &amp;&amp; array_key_exists('passwd', $_REQUEST)
+        &amp;&amp; UserLogin::validate($_REQUEST['name'],
+                                       $_REQUEST['passwd'])) {
+      $this-&gt;session-&gt;set('user_name', $_REQUEST['name']);
+      $this-&gt;response-&gt;redirect(SELF);
+    }</span>
+  }
+}
+</pre>
+
+<p class="docText">现在，这个程序已经进行了重构，并且已有足够的测试覆盖率，因此可以进行额外的重构来清除如主要脚本访问 <tt>Session</tt> 类，查找‘<tt>user_name</tt>’键，而非 <tt>UserLogin</tt> 类了解这个键，并把 <tt>Session</tt> 当作资源使用等怪癖。</p>
+
+<p class="docText">既然 <tt>$_REQUEST</tt> 可以包装在一个类似 <tt>Session</tt> 的资源中来方便地模拟它的时候，为什么代码还要访问这个超全局变量呢？这段代码还有很多问题：毕竟，它是一个有点蹩脚的例子，目的是引导你逐步了解这些概念，而且也希望它达到了这个目的。</p>
+
+<p class="docText">更为重要的是，你已经学会利用 MockObject 测试模式来隔离代码，为测试解除 <tt>$_SESSION</tt> 资源耦合，以及避免相互关联的对象(如包含在 <tt>Response</tt> 类中的 <tt>exit()</tt>) 产生不合希望的结果。</p>
+
+
+<h3 class="docSection1Title">小结</h3>
+
+<p class="docText">使用 MockObjects 进行测试让你可以隔离你所开发的代码。可以消除令人生厌的副作用和潜在的问题，极大地减少运行整个测试程序所花费的时间。这是一件很好的事情，因为花在测试上的时间越长，实际花在程序上的时间就会越短，而且你还应该能够并乐意地经常运行你的测试。</p>
+
+<p class="docText">新重构的应用程序仍然存有缺陷。<tt>$_REQUEST</tt> 应该用一个类包装起来，以便它也能够被模拟以进行测试。也可以回想一下 <tt>showLogin()</tt> 方法。它包含所有的 <tt>addBody()</tt> 方法调用，看起来十分混乱。</p>
+
+<p class="docText">这种编码方式的另一个缺点是你将无法使用任何所见即所得(WYSIWYG) HTML 编辑工具，这是因为所有的 HTML 都嵌入在 PHP 方法调用中。为了绕过这些限制，你可以加入一个非常简单的基于 PHP 的模板机制。你可能引入这样一个模板文件：</p>
+
+<pre>
+&lt;form method=&quot;post&quot;&gt;
+  Name:&lt;input type=&quot;text&quot; name=&quot;name&quot;&gt;
+  Password:&lt;input type=&quot;password&quot; name=&quot;passwd&quot;&gt;
+  &lt;input type=&quot;submit&quot; value=&quot;Login&quot;&gt;
+&lt;/form&gt;
+</pre>
+
+<p class="docText">然后需要用一个方法来调用它：</p>
+
+<pre>
+class Response {
+  // ...
+
+  /**
+   * adds a simple template mechanism to the response class
+   * @param string $template the path and name of the template file
+   * @return void
+   */
+  function addBodyTemplate($template, $vars=array()) {
+    if (file_exists($template)) {
+      extract($vars);
+      ob_start();
+      include $template;
+      $this-&gt;_body .= ob_get_clean();
+    }
+  }
+}
+</pre>
+
+<p class="docText">毫无疑问，这不是最流行的模板引擎，但它确实可以使本章范例中的代码更加整洁。</p>
+
+<p class="docText">GoF 中强调了分离职责的概念：</p>
+
+<p class="docText"></p><blockquote><span class="docEmphasis">“在独立的操作中创建对象，以便子类可以重载它们的创建方式”</span></blockquote><p></p>
+
+<p class="docText">如果你忠实地应用它来进行测试的话，你可以从这句话得到很多启发：用一个替代 MockObject，你可以用内部 Factory 方法代替所期望的类的实例。传统的测试模式遵循的是子类化你的测试代码，然后重写生成对象的方法。Marcus Baker，SimpleTest 的作者，为 PHP 创立了 PartialMock 技术，它是这个测试模式的一个简化操作。在创建时，你可以使用 PartialMock 来注入其它的 MockObjects。</p>
+
+<p class="docText">如果你还是很难理解如何在你的代码中使用 MockObject，请查看附录 B —— SimpleTest Testing Practices —— 的 Partial MockObject 一节。</p>
+
+<h2 class="docSection1Title">资源</h2>
+
+<p class="docText">有一些可以帮助你了解更多有关 MockObject 模式的资源。具体到 PHP，可以查看 SimpleTest 的 MockObject 文档(<a class="docLink" target="_blank" href="http://simpletest.sf.net/SimpleTest/tutorial_MockObjects.pkg.html">http://simpletest.sf.net/SimpleTest/tutorial_MockObjects.pkg.html</a>)。另外，Marcus Baker 在 2004 年二月版的 php|architect 上发表了一篇题为“Testing Made Easy with Mock Objects”的文章。</p>
+
+<p class="docText">更加一般地，<a class="docLink" target="_blank" href="http://www.mockobjects.com/">http://www.mockobjects.com/</a> 和 c2 为 MockObjects 建立的 wiki 页面(<a class="docLink" target="_blank" href="http://www.c2.com/cgi/wiki?MockObject">http://www.c2.com/cgi/wiki?MockObject</a>)都为研究提供了非常优秀的起点。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

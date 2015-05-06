@@ -1,0 +1,483 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第十七章 The Model-View-Controller Pattern —— MVC 模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第十七章 The Model-View-Controller Pattern —— MVC 模式</h2>
+
+<p class="docText">web 应用程序变化很大，而且，这种变化会引起大量的混乱，对于架构一个特定的应用程序，哪个或哪些模式是最好的。虽说如此，那么有没有一种“最好的”web 应用程序架构呢？</p>
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">你能不能部署一个单一 web 站点结构体系以适应每个常见的 web 应用程序，包括常见的表现元素、身份验证、表单验证，等等？</p>
+
+
+<h3 class="docSection1Title">解决方案</h3>
+
+<p class="docText">Model-View-Controller(模型-视图-控制器，MVC) 模式将你的软件组织并分解成三个截然不同的角色：</p>
+
+<ul class="docList">
+
+
+<li><p class="docText"><span class="docEmphasis">Model</span> 封装了你的应用数据、应用流程和业务逻辑。</p></li>
+
+<li><p class="docText"><span class="docEmphasis">View</span> 从 Model 获取数据并格式化数据以进行显示。</p></li>
+
+<li><p class="docText"><span class="docEmphasis">Controller</span> 控制程序流程，接收输入，并把它们传递给 Model 和 View。</p></li>
+
+</ul>
+
+<div class="docNote">
+
+<p class="docNoteTitle">MVC 的起源</p>
+
+<p class="docNoteText">Model-View-Controller 模式是由 Trygve Reenskaug 于七十年代后期在施乐公司的 Palo Alto 研究中心(Xerox's Palo Alto Research Center，PARC)最初设计的。最初的参考实现是用 Smalltalk-80 写的，其最初的目的是设计来解决应用程序中的 GUI 交互问题。</p>
+
+</div>
+
+<p class="docText">只要你与 MVC 模式打过交道，你就会对它的实用性心存感激，尤其对于图形用户界面(Graphical User Interface，GUI)应用程序。此外，MVC 对 web 应用程序也很有用，虽然通过一连串无状态 web 连接访问一个服务器应用程序的不连续性会存在一些独特的挑战(也可以说是一种机会)。 </p>
+
+<p class="docText">如果你翻阅本章，寻找“一种真正的方法”来为 web 应用程序实现 MVC，我希望你不会对这里的答案太失望。根本就不存在什么完美的解决方案，但是有很多“最优实践”以及相关模式，它们的确可以帮助你有效地实现 MVC。希望这里介绍的观点可以为你的代码视为一个跳板，并引导你进行更多的研究。</p>
+
+
+<h4 class="docSection2Title">The Model-View-Controller(模型-视图-控制器)</h4>
+
+<p class="docText">与其它设计模式不同，MVC 模式并没有直接反映一个你能够编写或配置的类结构。相反，MVC 更像一个概念上的指导原则或范型。</p>
+
+<p class="docText">概念上的 MVC 模式被描述为三个对象 —— Model、View 和 Controller —— 之间的关系。由于 View 和 Controller 都可以从 Model 请求数据，所以 Controller 和 View 都依赖 Model。任何输入都通过 Controller 进入你的系统，然后 Controller 选择一个 View 来发出结果。对你，一个 PHP 开发人员，更具体的来说，Controller 处理每个进入的 HTTP 请求，而 View 则生成 HTTP 响应。</p>
+
+<p class="docText">下面是一个概念上的 MVC 模式的图形描述：</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch17sec02No.01.gif" /></center></p>
+
+<p class="docText">在这个理想的 MVC 环境中，通信是单向的，如这个序列图所示：</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch17sec02No.10.gif" /></center></p>
+
+<p class="docText">当然，具体到细节上就有些麻烦了。当在一个 web 应用程序中实现 MVC 时，Modle、View 和 Controller 从来不会在单一的类中出现，而是被实现为紧密相关的对象群体，在那里，每一组执行一个特定的 MVC 任务。Controller 可能由几个类组成，它们被组合到一起，用于分析 HTTP 响应并确定应用程序所需的动作。Model 几乎可以确定由多个类组成。而 View 在 web 应用程序中通常是某种模板系统，而且也很可能由几个对象组成。</p>
+
+<p class="docText">在接下来的几节，我们稍微深入“MVC 三元组”的每个部分，了解每个部分都包含哪些模式，或哪些设计模式可以帮助实现每个部分，以及这些模式是如何帮助你组织你的代码的。</p>
+
+
+<h5 class="docSection3Title">模型</h5>
+
+<p class="docText">Model 包含了你的应用逻辑和数据，在你的应用程序中，它很可能是主要的值驱动器。Model 没有任何与表现层相关的特性，而且也和 HTTP 请求处理职责中完全无关。(作为一个经验方法，PHP Model 中决不要出现 HTML 标签或 <tt>$_GET</tt> 超全局变量)</p>
+
+
+<h6 class="docSection4Title">领域模型</h6>
+
+<p class="docText">Domain Model 是一个对象层，是对现实世界逻辑、数据和你应用程序所处理的问题的抽象。Domain Model 可分为两大类：Simple Domain Model 和 Rich Domain Model。</p>
+
+<p class="docText">Simple Domain Model 往往是业务对象和数据库表之间一对一的通信。你已经见过的几种模式 —— Active Record、Table Data Gateway，以及 Data Mapper，所有这些与数据库相关的设计模式 —— 可以帮助你把与数据库相关的逻辑组织成一个 Domain Model(为了使本书例子合理、简单、易懂，所选素材都没有超出简单 Domain Model 的一对一的通信 —— 同构映射）。</p>
+
+<p class="docText">Rich Domain Model 包含复杂的，使用继承机制紧密联系在一起的对象网络，在本书和 GoF 一书中介绍的众多模式起着杠杆作用。Rich Domain Models 往往是柔性的，精心测试过的，不断重构的，而且与它们所表达的领域所需的业务逻辑紧密耦合。</p>
+
+<p class="docText">采用哪种 Domain Model 类型取决于你的应用环境。如果你正在建立的是一个非常简单的表单处理 web 应用，没必要建立 Rich Domain Model。然而，如果你正在编写一个价值数百万的企业内联网架构的核心库，那么努力开发一个 Rich Domain Model 就是值得的，它可以为你提供一个准确表达业务过程的平台，并可以让你快速传输数据。</p>
+
+<p class="docText">Martin Fowler 在 PoEAA 中同时简要介绍了两种 Domain Model。而 Eric Evans 的 Domain Driven Design 一书，则完全专注于 Rich Domain Model 的实践应用和开发过程。</p>
+
+
+<h5 class="docSection3Title">视图</h5>
+
+<p class="docText">View 用于处理所有表现层方面的问题。View 从 Model 获取数据，并可以把它格式化成用于 web 页的 HTML，用于 web 服务的 XML，或用于 email 的文本。</p>
+
+<p class="docText">鉴别你是否已经把你的代码成功地分离成了明确定义的角色的一个好方法就是，试着去取代(至少从概念上)另一个产生完全不同输出的 View。举例来说，如果你有一个 web 应用程序，要让程序使用 PHP CLI 在命令行方式下运行，你将必须做何更改？</p>
+
+<p class="docText">尽管 View 有权访问 Model，但是让 View 调用 Model 的方法来改变它的状态是一种很不好的方式 —— 更新只应该由 Controller 来执行。View 调用的 Model 方法应该是没有副作用的只读数据检索方法。</p>
+
+<p class="docText">有两种设计模式经常在 Views 中使用：Template View 和 Transform View。</p>
+
+
+<h6 class="docSection4Title">Template View</h6>
+
+<p class="docText">Template View 是在 web 应用程序的 View 中使用的主要模式。这个模式使用一个包含特殊标记的模板文件(通常是 HTML)，当 Template View 被执行的时候，这些标记会被 Model 中的数据所替换。</p>
+
+<p class="docText">PHP 本身就是一个特殊的 Template View 的例子，叫做服务器页面。Savant 就是一个基于使用 PHP 作为模板本身的模板系统(<a class="docLink" target="_blank" href="http://www.phpsavant.com/">http://www.phpsavant.com/</a>)。</p>
+
+<p class="docText">下面是一个使用 <tt>Savant</tt> 的例子：</p>
+
+<pre>
+// PHP4
+require_once 'Savant2.php';
+
+$tpl =&amp; new Savant2();
+$tpl-&gt;assign('title', 'Colors of the Rainbow');
+$tpl-&gt;assign('colors', array('red',
+                                'orange',
+                                'yellow',
+                                'green',
+                                'blue',
+                                'indigo',
+                                'violet'));
+
+$tpl-&gt;display('rainbow.tpl.php');
+</pre>
+
+<p class="docText"><tt>Savant</tt> 模板文件 rainbow.tpl.php 像：</p>
+
+<pre>
+&lt;html&gt;&lt;head&gt;
+  &lt;title&gt;&lt;?php echo $this-&gt;title ?&gt;&lt;/title&gt;
+&lt;/head&gt;&lt;body&gt;
+&lt;h1&gt;&lt;?php echo $this-&gt;title ?&gt;&lt;/h1&gt;
+&lt;ol&gt;
+&lt;?php foreach ($this-&gt;colors as $color): ?&gt;
+&lt;li&gt;&lt;?php echo $color ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ol&gt;
+&lt;/body&gt;&lt;/html&gt;
+</pre>
+
+<p class="docText">使用复杂的模板系统，甚至是 Plain Old PHP Pages (POPP)，来避免变量替换，并在页面中嵌入控制结构和其它逻辑也总是很有诱惑力。然而，这样做的结果是在应用程序的表现层中混杂了业务逻辑，从而会导致一场维护噩梦。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">编写模版引擎</p>
+
+<p class="docNote">在 PHP 社区，编写模版引擎似乎就是一个坎。搜索 PHP 模版引擎，你会得到好几百个结果(这方面的实验例子见 <a class="docLink" target="_blank" href="http://www.sitepoint.com/forums/showthread.php?t=123769">http://www.sitepoint.com/forums/showthread.php?t=123769</a>)。如果你不选择使用任何一种流行的模版引擎，而想摆弄你自己的，这里提供了丰富的示例代码可供参考。</p>
+
+</div>
+
+<p class="docText"><a class="docLink" target="_blank" href="http://wact.sf.net/index.php/TemplateView">http://wact.sf.net/index.php/TemplateView</a> 指出了什么样的标记可以用于 Template View。包括属性语言，自定义标签，HTML 注释和其它自定义语法。</p>
+
+<p class="docText">流行的 Smarty 模板引擎(<a class="docLink" target="_blank" href="http://smarty.php.net/">http://smarty.php.net/</a>)就是一个使用自定义语法方法的模板引擎的例子。加载一个 Smarty 模板可能看起来像：</p>
+
+<pre>
+require_once 'Smarty.class.php';
+
+$tpl =&amp; new Smarty;
+$tpl-&gt;assign(array(
+  'title' =&gt; 'Colors of the Rainbow',
+  'colors' =&gt; array('red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'violet'))
+);
+
+$tpl-&gt;display('rainbow.tpl');
+</pre>
+
+<p class="docText">rainbow.html 的 Smarty 自定义语法如下：</p>
+
+<pre>
+&lt;html&gt;&lt;head&gt;
+&lt;title&gt;{$title}&lt;/title&gt;
+&lt;/head&gt;&lt;body&gt;
+&lt;h1&gt;{$title}&lt;/h1&gt;
+&lt;ol&gt;
+{section name=rainbow loop=$colors}
+&lt;li&gt;{$colors[rainbow]}&lt;/li&gt;
+{/section}
+&lt;/ol&gt;
+&lt;/body&gt;&lt;/html&gt;
+</pre>
+
+<p class="docText">WACT(<a class="docLink" target="_blank" href="http://wact.sf.net/">http://wact.sf.net/</a>) 模板引擎遵循 Martin Fowler 在 PoEAA 中指出的 Custom Tag 模式。然而 WACT 也支持类似于 Smarty 那样的自定义语法，WACT 的自定义标签数组输出可能看起来像：</p>
+
+<pre>
+require_once 'wact/framework/common.inc.php';
+require_once WACT_ROOT.'template/template.inc.php';
+require_once WACT_ROOT.'datasource/dictionary.inc.php';
+require_once WACT_ROOT.'iterator/arraydataset.inc.php';
+
+// simulate tabular data
+$rainbow = array();
+foreach (array('red', 'orange', 'yellow',
+               'green', 'blue', 'indigo', 'violet') as $color) {
+  $rainbow[] = array('color' =&gt; $color);
+}
+
+$ds =&amp; new DictionaryDataSource;
+$ds-&gt;set('title', 'Colors of the Rainbow');
+$ds-&gt;set('colors', new ArrayDataSet($rainbow));
+
+$tpl =&amp; new Template('/rainbow.html');
+$tpl-&gt;registerDataSource($ds);
+$tpl-&gt;display();
+</pre>
+
+<p class="docText">rainbow.html 模板可能看起来像：</p>
+
+<pre>
+&lt;html&gt;&lt;head&gt;
+&lt;title&gt;{$title}&lt;/title&gt;
+&lt;/head&gt;&lt;body&gt;
+&lt;h1&gt;{$title}&lt;/h1&gt;
+&lt;list:list id=&quot;rainbow&quot; from=&quot;colors&quot;&gt;
+&lt;ol&gt;
+&lt;list:item&gt;&lt;li&gt;{$color}&lt;/li&gt;&lt;/list:item&gt;
+&lt;/ol&gt;
+&lt;/list:list&gt;
+&lt;/body&gt;&lt;/html&gt;
+</pre>
+
+<p class="docText">这个 WACT 例子有相当多的包含文件。这是由于框架包含各种各样的组件，用于解决 web 应用程序问题的各个部分，而你只需包含你需要的组件。在上面的例子中，<tt>Template</tt> 类是一个 View，<tt>DictionaryDataSource</tt> 是 Model 的代理，而 PHP 脚本本身则充当 Controller。大多数自定义标签都被设计来处理列表数据 —— 比如从数据库取得的结果集 —— 因此在模板中使用它之前转变为简单数组。</p>
+
+<p class="docText">最后一种是用一个有效的 XML 文件作模板，并用单个元素的属性作为你的模板替换的目标。下面就是一个使用 PHPTAL (<a class="docLink" target="_blank" href="http://phptal.motion-twin.com/">http://phptal.motion-twin.com/</a>) 来演示这种技术的例子。</p>
+
+<pre>
+// PHP5
+require_once 'PHPTAL.php';
+
+class RainbowColor {
+  public $color;
+
+  public function __construct($color) {
+    $this-&gt;color = $color;
+  }
+}
+
+// make a collection of colors
+$colors = array();
+foreach (array('red', 'orange', 'yellow',
+               'green', 'blue', 'indigo', 'violet') as $color) {
+  $colors[] = new RainbowColor($color);
+}
+
+$tpl = new PHPTAL('rainbow.tal.html');
+$tpl-&gt;title = 'Colors of the Rainbow';
+$tpl-&gt;colors = $colors;
+
+try {
+  echo $tpl-&gt;execute();
+}
+catch (Exception $e){
+  echo $e;
+}
+</pre>
+
+<p class="docText">rainbow.tal.html 模板文件如下：</p>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot;?&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;title tal:content=&quot;title&quot;&gt;
+place for the page title
+&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1 tal:content=&quot;title&quot;&gt;sample title&lt;/h1&gt;
+&lt;ol&gt;
+&lt;li tal:repeat=&quot;item colors&quot;&gt;
+&lt;span tal:content=&quot;item/color&quot;&gt;color&lt;/span&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+
+<p class="docText">当然，所有这些解决方法的出发点都是把 Model 数据的表现从 Model 和应用程序本身分离开来。前面的每个例子本质上产生相同的内容，所以选择使用哪个全凭个人喜好。</p>
+
+
+<h6 class="section4Title">The Transform View</h6>
+
+<p class="docText">Transform View 从模型中取得数据，然后把数据转换为需要的输出格式。从本质上来讲，它就是用一种语言逐个遍历你的数据元素，并顺便生成输出。</p>
+
+<p class="docText">Template View 和 Transform View 的区别就在于数据流向。在 Template View 中，你首先定义一个输出框架，然后把领域数据插入其中。Transform View 则从数据着手，然后从它建立输出。</p>
+
+<p class="docText">实现 Transform View 的主要技术是 XSLT。</p>
+
+
+<h4 class="docSewction2Title">控制器</h4>
+
+<p class="docText">Controller 是大多数 PHP MVC 框架主要关注的 MVC 角色之一。这主要是考虑到，Model 对于应用来说是特定的，而几乎每个开发人员都已经有了他们所喜爱的模板引擎，View 的一个主要组件。</p>
+
+
+<h5 class="docSewction3Title">前端控制器(Front Controller)</h5>
+
+<p class="docText">把应用程序流程控制集中在一个地方通常是很有用的。集中化可以帮助你了解一个复杂系统是如何运行的，而且它还提供了一个单独的地方，在那里你可以插入全局代码，比如一个 Intercepting Filter。Front Controller 对于集中化处理是一个非常好的选择。</p>
+
+<div class="docNote">
+
+<p class="docNoteTitle">Intercepting Filter(截取过滤器)</p>
+
+<p class="docNoteText">截取过滤器模式是 GoF 书中的职责链模式(Chain of Responsibility)的一个实现。它考虑了顺序处理请求的情况，应用于常见的任务，比如日志或安全。</p>
+
+<p class="docNoteText">有两种常见的实现方式，一种是在一个链中连续地使用过滤器，直到到达应用控制器。另一种就类似一连串的装饰器，对于执行预过滤和后过滤操作都非常有用(想象一下一个用于去除空白或压缩的过滤器，你可以在预处理阶段输出缓存，并在后处理操作阶段执行你的过滤器)。</p>
+
+</div>
+
+<p class="docText">用一个简单的例子来演示与 Front Controller 结合的 Intercepting Filter 可能看起来会是什么样子，假设我们有一个用于我们的 <tt>Filters</tt> 的接口，它包含 <tt>preFilter()</tt> 和 <tt>postFilter()</tt> 方法。然后我们可以建立一种方法把过滤器添加到我们的 FrontController：</p>
+
+<pre>
+class FrontController {
+  var $_filter_chain = array();
+
+  function registerFilter(&amp;$filter) {
+    $this-&gt;_filter_chain[] =&amp; $filter;
+  }
+}
+</pre>
+
+<p class="docText">于是，在运行 FrontController 的实际工作前(产生页面，分发，等等)，我们可以依次应用 <tt>preFilter()</tt> 方法。在 FrontController 完成了它的任务之后，再以相反的顺序调用 <tt>postFilter()</tt> 方法。</p>
+
+<pre>
+class FrontController {
+  //...
+
+  function run() {
+    foreach(array_keys($this-&gt;_filter_chain) as $filter) {
+      $this-&gt;_filter_chain[$filter]-&gt;preFilter();
+    }
+    $this-&gt;_process();
+
+    foreach(array_reverse(array_keys($this-&gt;_filter_chain)) as $filter) {
+      $this-&gt;_filter_chain[$filter]-&gt;postFilter();
+    }
+  }
+
+  function _process() {
+    // do the FrontController work
+  }
+}
+</pre>
+
+<p class="docText">举一个例子，<tt>HtmlCommentFilter</tt> 类将从页面输出结果中删除所有的 HTML 注释。</p>
+
+<pre>
+class HtmlCommentFilter {
+  function preFilter() {
+    ob_start();
+  }
+
+  function postFilter() {
+    $page = ob_get_clean();
+    echo preg_replace('~&lt;!——.*——&gt;~ims',
+                      '',
+                      $page);
+  }
+}
+</pre>
+
+<h5 class="docSewction3Title">应用控制器</h5>
+
+<p class="docText">Front Controllers 经常把控制委托给 Application Controller，而 Application Controller 模式才是 MVC Controller 的真正核心所在。Controller 的首要职责就是决定应用程序应该如何响应请求。</p>
+
+<p class="docText">实现 Controller 的典型方式是使用 Command 模式。Command 模式把一个动作封装在一个对象里面，以便你能够参数化一个请求，把它加入队列，记入日志，甚至还支持像撤销一个动作那样的操作。在 web 应用环境中，分派一个具体的 Command 来执行一个特定的 HTTP 请求是非常有用的。从本质上来看，Command 模式让你可以分解你的应用程序和代码的非连续行为，每个作为一个小的，易于管理的类，然后以一个统一的 API，允许 Controller 分派到一个特定的具体 Command 来实现需要的应用功能。</p>
+
+<p class="docText">不要让这些充满专业术语气息的控制器对话和分发把你搞糊涂了。如果你已经在 PHP 上花费了哪怕只有几个小时，那你或许已经编写了某种 Application Controller。比如说，一个简单的发送到它自己的表单，例如 …</p>
+
+<pre>
+if (count($_POST)) {
+  // do form handling code
+} else {
+  // display the form
+}
+</pre>
+
+<p class="docText">…就是一种 Application Controller 形式。一个稍微复杂一点的 Application Controller 如下所示：</p>
+
+<pre>
+switch ($_POST['action']) {
+  case 'del': $action_class = 'DeleteBookmark'; break;
+  case 'upd': $action_class = 'UpdateBookmark'; break;
+  case 'add': $action_class = 'InsertBookmark'; break;
+  case 'show':
+  default:
+    $action_class = 'DisplayBookmark';
+}
+
+if (!class_defined($action)) {
+  require_once 'actions/'.$action_class.'.php';
+}
+
+$action =&amp; new $action_class;
+$action-&gt;run();
+</pre>
+
+<p class="docText">另一种实现分发的可能的方式是使用一个加载了一个联合数组的配置信息。你可以如下方式而告终：</p>
+
+<pre>
+$action_map = array(
+  'del' =&gt; 'DeleteBookmark',
+  'upd' =&gt; 'UpdateBookmark',
+  'add' =&gt; 'InsertBookmark'
+);
+
+$action_class = (array_key_exists($_POST['action'], $action_map))
+  ? $action_map[$_POST['action']]
+  : 'DisplayBookmark';
+
+if (!class_defined($action)) {
+  require_once 'actions/'.$action_class.'.php';
+}
+
+$action =&amp; new $action_class;
+$action-&gt;run();
+</pre>
+
+<p class="docText">根据我在 web 应用方面的经验显示，与框架的分发机制比较起来，“二次分发”可能是一个有用的智能映射。第一次是分发到一个“动作”，需要用你的 Model 执行一个动作的任何事件。在完成任何可见的动作之后，将发出一个 HTTP 重定向，通知客户端选择一个特定的 View。因此，第二次分发就是选择一个特定的 View。(在这种方法的早期过程化程序中，我使用了一个分支语句，但 MVC 范型有助于使用 Commond 模式来执行这样的分发。)</p>
+
+
+
+<p class="docText">“现实”版的 Model-View-Controller 序列图与上面显示的“理想”版序列图看起来非常相似。主要增加了一个 <tt>ActionFactory</tt>，用来产生每个 Action，也就是一个具体 Command。</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch17sec02No.20.gif" /></center></p>
+
+<p class="docText">在我已经开发的许多 MVC 实现中，第二次分发由默认的 <tt>ShowViewAction</tt> 执行。</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch17sec02No.20.gif" /></center></p>
+
+<p class="docText">这个图显示第一次分发创建了具体的 Command <tt>ShowViewAction</tt>。这个 Action 接着使用一个 <tt>ViewFacory</tt> 来创建一个具体的 View 类，Martin Fowler 在 PoEAA 的 MVC 中的关于 Views 的部分称之为视图助手(View Helper)。这个 View 可以使用你喜欢的 TemplateEngine 来选择并解析一个模板文件，填充模板变量：从 Model 取得数据，根据模板渲染结果内容，然后返回给客户端。</p>
+
+<p class="docText">正是这种图给 MVC 带来了一个臃肿的名声，但是事实上，这个图中的每个元素都被加入来响应一个需求，组织代码以使其更容易维护。</p>
+
+<p class="docText">通常，我发现使用一个特定的框架最显著的障碍就是了解框架如何运行以及如何添加应用程序所特有的功能。一旦理解了，实际的结构是非常简单易懂的，但初看起来往往使人畏缩和无所适从。</p>
+
+
+<h4 class="docSewction2Title">Cross-Cutting MVC Concerns</h4>
+
+<p class="docText">围绕 MVC，似乎有许许多多“何去何从”的问题，而且，从不同的 MVC 拥护者那里，你可以得到截然不同的答案。</p>
+
+<p class="docText"><tt>$_SESSION</tt> 应该属于哪里？一种观点认为，会话是一个持续性数据存储器，通常以服务器文件的方式实现，因此最适合放在 Model 中。第二种观点认为，就像其它 PHP 超全局变量一样，会话数据是对系统的输入，并且因此理所当然地应该属于 Controller。然而另一群开发人员却认为，会话是用 <tt>cookies</tt> 实现的，Cookie 是一种只在 HTTP 上与 HTML 一起工作的技术，因此会话是与 View 相关的，所以应该属于 View。</p>
+
+<p class="docText">身分验证应该属于哪里？它似乎是应用逻辑的部分，因此应该属于 Model。但是如果你想限制某些操作(Controller 的部分)只给已确认的用户呢？好，Controller 可以访问 Modle，因此，它似乎是一个好地方。但是 HTTP 身份验证呢？难道也放入 Controller 吗？</p>
+
+<p class="docText">在这整个概念中，浏览器又适合放到哪个位置呢？很明显是 View，对吗？那如果你想实现 Javascript 验证呢？验证不是属于 Controller 和 Model 的吗？你怎么又把它放到 View 中去了呢？</p>
+
+<p class="docText">这些争论永远没有平息的迹象。当你试图在你的 MVC 实现中解决如何定位这些关系的时候，每一个都可能引起强烈的思想斗争。</p>
+
+
+<h4 class="docSewction2Title">Non-MVC Frameworks(非 MVC 框架)</h4>
+
+<p class="docText">很明显，并非每个框架都是围绕分离嵌入在 MVC 模式中的关系和想法而设计的。下面是一个非 MVC 框架构思的小列子。</p>
+
+
+<h5 class="docSewction3Title">Event Handling</h5>
+
+<p class="docText">当你在 GUI 环境下工作时，工具通常被设置来响应事件。比如 <tt>button.click()</tt>。有几种 PHP 框架已经尝试把这作为其核心思想。</p>
+
+<p class="docText">Prado 是最近在 Zend 的 PHP5 编码竞赛中得到公认的，它把事件处理作为核心概念。WACT 采用的是用 Composite 模式来集中控制器的概念，每个控制器都有“监听器”，可以近似为一个事件处理观点。</p>
+
+
+<h5 class="docNoteTitle">Inversion of Control Containers(控制容器倒置)</h5>
+
+<p class="docNote">Inversion of Control Containers(控制容器倒置，IoC) 是 Java 圈子里的一个热门话题，也称依赖注入(Dependency Injection)模式。关于这个模式的一篇不错的介绍文章可以在 <a class="docLink" target="_blank" href="http://www.martinfowler.com/articles/injection.html">http://www.martinfowler.com/articles/injection.html</a> 找到。</p>
+
+<p class="docText">有一个很有前途的 PHP5 项目，它是在 <a class="docLink" target="_blank" href="http://www.picocontainer.org/">http://www.picocontainer.org/</a> 的原始的 Java PicoContainer 的一个端口(port)。</p>
+
+<p class="docText">Dependency Injection 是一个在我自己的开发工作中我个人非常有兴趣使用的一个模式，因为它天生就与测试驱动开发方法工作的很好，允许你更加容易地测试你的代码，因为它从一开始就设计来很好地与其它组件一起运行。</p>
+
+
+<h3 class="docSection1Title">结束语</h3>
+
+<p class="docText">本章对 MVC 及相关的设计模式做了一个简单的介绍。如果你想查看完整设计的 PHP MVC 框架，我推荐你回头去看看 Mojavi(<a class="docLink" target="_blank" href="http://www.mojavi.org/">http://www.mojavi.org/</a>)；这是一个很好的 MVC 模式的例子，而且这个项目正在进行积极地开发，其社区也非常活跃。</p>
+
+<p class="docText">正如你所看到的，我对 WACT(<a class="docLink" target="_blank" href="http://phpwact.org/">http://phpwact.org/</a>) 情有独钟，它在用框架组件作为 MVC 三元组的所有三个部分方面有少许不同：它使用了一个 Composite Controller 机制，用一个 Custom Tag 模板系统作 View，并且使用 <tt>DataSource</tt>(见第 10 章 —— 规范模式) 作为 Model 的通用代理。</p>
+
+<p class="docText">本章不可能已经解决了你在 web 架构方面所遇到的任何问题，不过希望它给你提供了一些观念，可以作为进行进一步研究的出发点，而且甚至还可能为你在编写能够给 PHP 开发带来巨大变革的 Magic Web Application Architecture 时带来一些灵感。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>

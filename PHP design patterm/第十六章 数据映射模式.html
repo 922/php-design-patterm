@@ -1,0 +1,855 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>第十六章 The Data Mapper Pattern —— 数据映射模式</title>
+<link href="styles/common.css" rel="stylesheet" type="text/css" />
+<link href="styles/docsafari.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+<h2 class="docChapterTitle">第十六章 The Data Mapper Pattern —— 数据映射模式</h2>
+
+<p class="docText">前两章 —— Active Record 模式和 Table Data Gateway 模式 —— 分别介绍了抽象一个表行和一个单独的表的策略。尽管这两种模式都很有用，但它们的实现都与底层数据库结构紧密耦合，因此，基于这些模式的解决方法往往是很脆弱的。例如，如果你的代码用字段名作数据行数组或对象的键和属性，那么你的应用程序就会与数据库结构绑在一起，对表中的每个(相关的)细微改动，你都不得不在 PHP 代码中做大范围的更改。</p>
+
+<p class="docText">因为代码和数据库在开发过程中经常变动，而且在部署后也会改进，所以尽可能地分离领域代码和它的数据库，隔离相互依赖性，减少实现一个改变所需的工作量是非常有好处的。</p>
+
+
+<h3 class="docSection1Title">问题</h3>
+
+<p class="docText">如何将程序中的类和它的数据库之间的耦合降到最低？例如，如果改变表的一两个字段的名字，怎样才能把所需的修改降到最低？</p>
+
+
+<h3 class="docSection1Title">解决方案</h3>
+
+<p class="docText">Data Mapper 模式解除了对象属性和保存它们的表字段之间的耦合。Data Mapper 模式的本质就是一个类，它把领域对象的属性和/或方法映射或转换为数据库表字段，反之亦然。Data Mapper 的工作就是，了解信息的表示方法并能够来回发送信息，基于数据库中的信息创建新的领域对象，以及利用领域对象的信息更新或删除数据库中的信息。</p>
+
+<p class="docText">面向对象代码和数据库表及字段之间的映射可以以各种各样的形式存储。一种可能是把映射关系手工编码在 Data Mapper 类中。另一种选择是在类本身里面编写一个 PHP 数组。另外，也可以从一个外部资源提取信息，如 INI 文件或 XML 文件。</p>
+
+<p class="docText">下图显示了一个 Data Mapper 模式的类图，这些类用于解决前两章所用到的存取 <tt>URL</tt> 书签的问题域。图中，<tt>Bookmark</tt> 是领域对象，<tt>BookmarkMapper</tt> 是 Data Mapper 模式的一个实现。<tt>Bookmark</tt> 应该包含象验证 <tt>URL</tt> 那样的业务逻辑。<tt>BookmarkMapper</tt> 则扮演 <tt>Bookmark</tt> 的 getter 和 setter 方法与书签表字段结构之间的一个完整的交叉参照。</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch16sec02No.01.gif" /></center></p>
+
+<p class="docText">这两个类紧密相关：<tt>BookmarkMapper</tt> 充当了 <tt>Bookmark</tt> 实例的一个 Factory，并且接受 <tt>Bookmark</tt> 类的实例作为大量 <tt>BookmarkMapper</tt> 操作的参数。</p>
+
+
+<h3 class="docSection1Title">范例代码</h3>
+
+<p class="docText">以 UML 图为引导，我们来实现这两个类，<tt>Bookmark</tt> 和 <tt>BookmarkMapper</tt>。</p>
+
+<p class="docText">首先，如上所述，需要某种配置来处理表字段和对象方法之间的映射。本例中，我们使用一个 <tt>XML</tt> 配置文件。</p>
+
+<p class="docText">这个配置的目的是列出 <tt>bookmark</tt> 表的字段，并指定哪个方法用于设置和从 <tt>Bookmark</tt> 对象提取各自的信息。一个非常简单的包，含一个 <tt>&lt;bookmark&gt;</tt> 根元素和一系列 <tt>&lt;field&gt;</tt> 元素的 XML 格式就足够了，如下所示：</p>
+
+<pre>
+&lt;field&gt;
+  &lt;name&gt;url&lt;/name&gt;
+  &lt;accessor&gt;getUrl&lt;/accessor&gt;
+  &lt;mutator&gt;setUrl&lt;/mutator&gt;
+&lt;/field&gt;
+</pre>
+
+<p class="docText"><tt>&lt;name&gt;</tt> 元素保存了实际的物理数据库字段名。<tt>&lt;accessor&gt;</tt> 元素用来命名获取属性的方法，而且是可选的，因为有些字段，如时间戳，并不需要映射。<tt>&lt;mutator&gt;</tt> 元素保存了装配对象值时要用到的 <tt>Bookmark</tt> 方法。</p>
+
+<p class="docText">(也可以在这个映射中增加其它信息。例如，你也可以声明每个字段的类型和大小，并用这些信息动态生成建立数据表所需的 <tt>SQL</tt>。如果你的程序有一个用 PHP 写的安装程序包，那么你可能会对此特别感兴趣，这样你就可以用映射来建立数据表结构了。当基于这样的信息设置 PHP 对象的属性时，你还可以自动地类型化数字和日期字段。)</p>
+
+<p class="docText">完整的 XML 文件如下：</p>
+
+<pre>
+&lt;bookmark&gt;
+  &lt;field&gt;
+    &lt;name&gt;id&lt;/name&gt;
+    &lt;accessor&gt;getId&lt;/accessor&gt;
+    &lt;mutator&gt;setId&lt;/mutator&gt;
+  &lt;/field&gt;
+  &lt;field&gt;
+    &lt;name&gt;url&lt;/name&gt;
+    &lt;accessor&gt;getUrl&lt;/accessor&gt;
+    &lt;mutator&gt;setUrl&lt;/mutator&gt;
+  &lt;/field&gt;
+  &lt;field&gt;
+    &lt;name&gt;name&lt;/name&gt;
+    &lt;accessor&gt;getName&lt;/accessor&gt;
+    &lt;mutator&gt;setName&lt;/mutator&gt;
+  &lt;/field&gt;
+  &lt;field&gt;
+    &lt;name&gt;description&lt;/name&gt;
+    &lt;accessor&gt;getDesc&lt;/accessor&gt;
+    &lt;mutator&gt;setDesc&lt;/mutator&gt;
+  &lt;/field&gt;
+  &lt;field&gt;
+    &lt;name&gt;tag&lt;/name&gt;
+    &lt;accessor&gt;getGroup&lt;/accessor&gt;
+    &lt;mutator&gt;setGroup&lt;/mutator&gt;
+    &lt;/field&gt;
+  &lt;field&gt;
+    &lt;name&gt;created&lt;/name&gt;
+    &lt;mutator&gt;setCrtTime&lt;/mutator&gt;
+    &lt;/field&gt;
+  &lt;field&gt;
+    &lt;name&gt;updated&lt;/name&gt;
+    &lt;mutator&gt;setModTime&lt;/mutator&gt;
+  &lt;/field&gt;
+&lt;/bookmark&gt;
+</pre>
+
+<p class="docText">我们可以利用 PHP5 中名为 <tt>SimpleXML</tt> 的特性来读取和解析这个文件。你所需要做的就是调用 <tt>simplexml_load_file('bookmark.xml')</tt>，于是你就有了一个现成的，包含 XML 文件的所有信息的 <tt>SimpleXMLElement</tt> 复合对象。对于这个例子，其结果如下：</p>
+
+<pre>
+object(SimpleXMLElement)#21 (1) {
+  [&quot;field&quot;]=&gt;
+    array(7) {
+      [0]=&gt;
+object(SimpleXMLElement)#15 (3) {
+[&quot;name&quot;]=&gt;
+string(2) &quot;id&quot;
+[&quot;accessor&quot;]=&gt;
+string(5) &quot;getId&quot;
+[&quot;mutator&quot;]=&gt;
+string(5) &quot;setId&quot;
+}
+[1]=&gt;
+object(SimpleXMLElement)#19 (3) {
+[&quot;name&quot;]=&gt;
+string(3) &quot;url&quot;
+[&quot;accessor&quot;]=&gt;
+string(6) &quot;getUrl&quot;
+[&quot;mutator&quot;]=&gt;
+string(6) &quot;setUrl&quot;
+}
+//...&lt;snip&gt;...
+[4]=&gt;
+object(SimpleXMLElement)#23 (3) {
+[&quot;name&quot;]=&gt;
+string(3) &quot;tag&quot;
+[&quot;accessor&quot;]=&gt;
+string(8) &quot;getGroup&quot;
+[&quot;mutator&quot;]=&gt;
+string(8) &quot;setGroup&quot;
+}
+//...&lt;snip&gt;...
+}
+</pre>
+
+<p class="docText">由于这个 XML 文件在领域空间和数据库空间之间建立了映射，所以 <tt>BookmarkMapper</tt> 在创建时会读取这个 XML 配置文件。</p>
+
+<p class="docText">在正式研究 <tt>BookmarkMapper</tt> 之前，我们先深入研究一下 <tt>Bookmark</tt> 类。假设 <tt>Bookmark</tt> 在现有项目中已经被大量使用了，那么最好尽可能少的影响它。而且，<tt>Bookmark</tt> 不应该仅仅为了适应 <tt>BookmarkWapper</tt> 而修改。实际上，Data Mapper 模式就是旨在亲和。领域对象本身对 Data Mapper 的存在完全透明。</p>
+
+<p class="docText">这又导致了实现 Data Mapper 模式的另一个重要的需求：因为每个领域对象对 Data Mapper 完全透明，所有相关的领域对象必须为相关属性提供某种公共访问，以便 DataMapper 在创建领域对象的时候能够正确地初始化对象，并在保存领域对象的时候能够读取属性。<tt>Bookmark</tt> 的所有属性都定义为 <tt>protected</tt>，但为每个属性都提供了 getter 和 setter 方法，所以它满足需要。</p>
+
+<p class="docText">我们从编写设置和获取 <tt>Bookmark</tt> 类的“<tt>url</tt>”属性的代码开始。</p>
+
+<pre>
+class Bookmark {
+  protected $url;
+  // ...
+
+  public function getUrl() {
+    return $this-&gt;url;
+  }
+
+  public function setUrl($url) {
+    $this-&gt;url = $url;
+  }
+}
+</pre>
+
+<p class="docText">可以利用 <tt>reflection</tt>(映射) 避免单调地编写无数简单的 getter 和 setter 方法。通过对对象自身的“窥探”，可以让对象来决定是否一个特定的属性应该有或没有 getter 和 setter 方法，以及这些方法应该如何命名。</p>
+
+<p class="docText">我们从一些测试开始：</p>
+
+<pre>
+class BookmarkTestCase extends BaseTestCase {
+  //...
+
+  function testAccessorsAndMutators() {
+    $bookmark = new Bookmark(false);
+
+    $props = array('Url', 'Name', 'Desc', 'Group', 'CrtTime', 'ModTime');
+    foreach ($props as $prop) {
+      $getprop = &quot;get$prop&quot;;
+      $setprop = &quot;set$prop&quot;;
+
+      $this-&gt;assertNull($bookmark-&gt;$getprop());
+
+      $val1 = 'some_val';
+      $bookmark-&gt;$setprop($val1);
+      $this-&gt;assertEqual($val1, $bookmark-&gt;$getprop());
+
+      $val2 = 'other_val';
+      $bookmark-&gt;$setprop($val2);
+      $this-&gt;assertNotEqual($val1, $bookmark-&gt;$getprop());
+      $this-&gt;assertEqual($val2, $bookmark-&gt;$getprop());
+    }
+  }
+}
+</pre>
+
+<p class="docText">对每个 <tt>Bookmark</tt> 属性，这个测试都通过 mutator 方法设定了一个值，然后验证 accessor 方法返回相同的值。然后值再次被改变并验证。</p>
+
+<p class="docText">这段代码依赖惯例而非某种明确的映射。获取和变更方法的名称分别以 <tt>get</tt> 和 <tt>set</tt> 打头，然后跟属性名(小写形式)组成。例如，“<tt>url</tt>”的获取方法的名称是 <tt>getUrl()</tt>；修改方法是 <tt>setUrl()</tt>。</p>
+
+<p class="docText">下面是实现动态获取和修改方法的一些代码。</p>
+
+<pre>
+class Bookmark {
+  protected $url;
+  protected $name;
+  protected $desc;
+  protected $group;
+  protected $crttime;
+  protected $modtime;
+  //...
+
+  public function __call($name, $args) {
+    if (preg_match('/^(get|set)(\w+)/', strtolower($name), $match)
+                   &amp;&amp; $attribute = $this-&gt;validateAttribute($match[2])) {
+      if ('get' == $match[1]) {
+        return $this-&gt;$attribute;
+      } else {
+        $this-&gt;$attribute = $args[0];
+      }
+    }
+  }
+
+  protected function validateAttribute($name) {
+    if (in_array(strtolower($name),
+        array_keys(get_class_vars(get_class($this))))) {
+      return strtolower($name);
+    }
+  }
+}
+</pre>
+
+<p class="docText">这段代码依赖 PHP5 的“魔术”方法 <tt>__call()</tt>，不管什么时候，只要一个未定义(没有在类中明确定义)实例方法被调用，它就会调用。<tt>__call()</tt> 本质上是一个回调方法。被调用的方法的名字(未定义的)作为第一个参数被传递给 <tt>__call()</tt>，而任何方法参数以一个数组的形式作为第二个参数被传入。</p>
+
+<p class="docText">为了实现动态创建 getter 和 setter 方法，被调用的方法的名字被提取出来，看它是否以“<tt>get</tt>”或“<tt>set</tt>”开始，并且以一个正确的对象属性名结束。如果是这样的话，属性就会被正确地修改或返回。这种动态方式代替了手工编写 <tt>getUrl()</tt> 和 <tt>setUrl()</tt>，因此它们可以安全地从代码中删除了。</p>
+
+<p class="docText">可是，有一个副作用需要注意：如果对这段代码调用别的方法，不会给出错误信息。为了防止这种情况，如果调用方法无效，就抛出一个异常。</p>
+
+<pre>
+class Bookmark {
+  //...
+
+  public function __call($name, $args) {
+    if (preg_match('/^(get|set)(\w+)/', strtolower($name), $match)
+                   &amp;&amp; $attribute = $this-&gt;validateAttribute($match[2])) {
+      if ('get' == $match[1]) {
+        return $this-&gt;$attribute;
+      } else {
+        $this-&gt;$attribute = $args[0];
+      }
+    <strong>} else {
+      throw new Exception('Call to undefined method Bookmark::'.$name.'()');</strong>
+    }
+  }
+}
+</pre>
+
+<p class="docText">你也可以对这个异常进行测试：</p>
+
+<pre>
+class BookmarkTestCase extends BaseTestCase {
+  //...
+
+  function testBadGetSetExceptions() {
+    $mapper = new BookmarkMapper($this-&gt;conn);
+    $this-&gt;addSeveralBookmarks($mapper);
+
+    $bookmark = $mapper-&gt;findById(1);
+
+    try {
+      $this-&gt;assertNull($bookmark-&gt;getFoo());
+      $this-&gt;fail('no exception thrown');
+    } catch (Exception $e) {
+      $this-&gt;assertWantedPattern('/undefined.*getfoo/i',
+                                 $e-&gt;getMessage());
+    }
+
+    try {
+      $this-&gt;assertNull($bookmark-&gt;setFoo('bar'));
+      $this-&gt;fail('no exception thrown');
+    } catch (Exception $e) {
+      $this-&gt;assertWantedPattern('/undefined.*setfoo/i',
+                                 $e-&gt;getMessage());
+    }
+  }
+}
+</pre>
+
+<p class="docText">这里还需要注意一点：<tt>$id</tt> 属性一旦设置了就应该不能再改了。</p>
+
+<p class="docText">让我们为不变的 <tt>ID</tt> 属性创建一个测试。<tt>setId()</tt> 能被调用一次来设置 <tt>ID</tt>，然后就可以反复使用 <tt>getId()</tt> 来获取其值，但随后对 <tt>setId()</tt> 的调用就应该无效了。</p>
+
+<pre>
+class BookmarkTestCase extends BaseTestCase {
+  //...
+
+  function testUnsetIdIsNull() {
+    $bookmark = new Bookmark;
+    $this-&gt;assertNull($bookmark-&gt;getId());
+  }
+
+  function testIdOnlySetOnce() {
+    $bookmark = new Bookmark;
+
+    $id = 10; //just a random value we picked
+    $bookmark-&gt;setId($id);
+    $this-&gt;assertEqual($id, $bookmark-&gt;getId());
+
+    $another_id = 20; // another random value, != $id
+    //state the obvious
+    $this-&gt;assertNotEqual($id, $another_id);
+    $bookmark-&gt;setId($another_id);
+
+    // still the old id
+    $this-&gt;assertEqual($id, $bookmark-&gt;getId());
+  }
+}
+</pre>
+
+<p class="docText">应该记住一个非常重要的规则，在类中显示定义的方法会重载由 <tt>__call()</tt> 执行的同名方法。只需要给类增加一个指定的方法，你就可以为任何指定的方法定义一个特殊的，完全不同的行为。如下所示，<tt>setId()</tt> 将会重载任何对 <tt>__call()</tt> 的反复调用。</p>
+
+<pre>
+class Bookmark {
+  protected $id;
+  //...
+
+  public function setId($id) {
+    if (!$this-&gt;id) {
+      $this-&gt;id = $id;
+    }
+  }
+}
+</pre>
+
+<p class="docText">迄今为止，我们得到的只是一个基本的数据对象，因此，让我们加入一些领域逻辑 —— 毕竟，应用 Data Mapper 模式的原因之一就是把领域逻辑从领域对象的持久性存储中分离出来。为了与“告知，而不是询问”设计原则保持一致，增加一个 <tt>fetch()</tt> 方法来返回书签页面的实际(HTML)内容。</p>
+
+<p class="docText">下面是这个功能的一个测试：</p>
+
+<pre>
+class BookmarkTestCase extends BaseTestCase {
+  //...
+
+  function testFetch() {
+    $bookmark = new Bookmark;
+    $bookmark-&gt;setUrl('http://www.google.com/');
+
+    $page = $bookmark-&gt;fetch();
+
+    $this-&gt;assertWantedPattern(
+      '~&lt;input[^&gt;]*name=q[^&gt;]*&gt;~im',
+      $page
+    );
+  }
+}
+</pre>
+
+<p class="docText">下面是一个实现示例：</p>
+
+<pre>
+class Bookmark {
+  //...
+
+  public function fetch() {
+    return file_get_contents($this-&gt;url);
+  }
+}
+</pre>
+
+<p class="docText">现在，完整的类如下所示：</p>
+
+<pre>
+class Bookmark {
+  protected $id;
+  protected $url;
+  protected $name;
+  protected $desc;
+  protected $group;
+  protected $crttime;
+  protected $modtime;
+
+
+  public function setId($id) {
+    if (!$this-&gt;id) {
+      $this-&gt;id = $id;
+    }
+  }
+
+  public function __call($name, $args) {
+    if (preg_match('/^(get|set)(\w+)/', strtolower($name), $match)
+                   &amp;&amp; $attribute = $this-&gt;validateAttribute($match[2])) {
+      if ('get' == $match[1]) {
+        return $this-&gt;$attribute;
+      } else {
+        $this-&gt;$attribute = $args[0];
+      }
+    } else {
+      throw new Exception('Call to undefined method Bookmark::'.$name.'()');
+    }
+  }
+
+  protected function validateAttribute($name) {
+    if (in_array(strtolower($name),
+        array_keys(get_class_vars(get_class($this))))) {
+      return strtolower($name);
+    }
+  }
+
+  public function fetch() {
+    return file_get_contents($this-&gt;url);
+  }
+}
+</pre>
+
+<p class="docText">掌握了 <tt>Bookmark</tt> 类，我们再回到 <tt>BookmarkMapper</tt> 类。<tt>BookmarkMapper</tt> 的核心任务是从数据库取出数据，并创建 <tt>Bookmark</tt> 对象。</p>
+
+<p class="docText"><tt>BookmarkMapper</tt> 要完成的第一个任务是给数据表添加新记录。</p>
+
+<p class="docText">在 Data Mapper 模式中，领域对象对 Data Mapper 完全透明，但它包含了所有的业务逻辑，以及有关对象创建的潜在规则。一个合理的用于创建记录的方法然后又用来创建一个 <tt>Bookmark</tt> 类的新的实例，设置属性，然后请求<tt> BookmarkMapper</tt> 保存这个新建的实例。我们就来实现一个这样的接口。</p>
+
+<p class="docText"><tt>BookmarkMapper</tt> 必须与数据库进行交互。就像前两章那样，我们还是用 <tt>ADOdb</tt> 作数据库访问层。此外，我们还在创建 <tt>BookmarkMapper</tt> 的时候传递一个 <tt>ADOdb</tt> 连接。</p>
+
+<pre>
+class BookmarkMapper {
+  protected $conn;
+
+
+  public function __construct($conn) {
+    $this-&gt;conn = $conn;
+  }
+}
+</pre>
+
+<p class="docText"><tt>BookmarkMapper</tt> 还必须读取前面那个 XML 文件。为了使 XML 更加易于使用，把映射保存为一个“<tt>name =&gt;</tt> 映射文件中每个子段的 <tt>simplexml</tt> 对象”哈希表。把这个功能增加到构造函数于是就得到了：</p>
+
+<pre>
+class BookmarkMapper {
+  protected $map = array();
+  protected $conn;
+
+
+  public function __construct($conn) {
+    $this-&gt;conn = $conn;
+    foreach (simplexml_load_file('bookmark.xml') as $field) {
+     $this-&gt;map[(string)$field-&gt;name] = $field;
+    }
+  }
+}
+</pre>
+
+<p class="docText">现在，该给 <tt>save()</tt> 方法创建一个测试用例了。</p>
+
+<pre>
+class BookmarkMapperTestCase extends BaseTestCase {
+  function testSave() {
+    $bookmark = new Bookmark;
+    $bookmark-&gt;setUrl('http://phparch.com/');
+    $bookmark-&gt;setName('php|architect');
+    $bookmark-&gt;setDesc('php|arch magazine homepage');
+    $bookmark-&gt;setGroup('php');
+
+    $this-&gt;assertNull($bookmark-&gt;getId());
+
+    $mapper = new BookmarkMapper($this-&gt;conn);
+    $mapper-&gt;save($bookmark);
+
+    $this-&gt;assertEqual(1, $bookmark-&gt;getId());
+    // a row was added to the database table
+    $this-&gt;assertEqual(
+      1,
+      $this-&gt;conn-&gt;getOne('select count(1) from bookmark')
+    );
+  }
+}
+</pre>
+
+<p class="docText">这里，测试创建了一个新的 <tt>Bookmark</tt> 类的实例，并设置了相关的对象属性，然后请求 <tt>BookmarkMapper</tt> 实例来 <tt>save()</tt> <tt>Bookmark</tt>。跟着，这个测试还验证了保存对象的同时也设置了它的 <tt>ID</tt>，并插入了一条记录到数据库。</p>
+
+<p class="docText">接下来，我们编写一些代码来实现它。</p>
+
+<pre>
+class BookmarkMapper {
+  //...
+
+  const INSERT_SQL = &quot;insert into bookmark (url, name,
+    description, tag, created, updated)
+    values (?, ?, ?, ?, now(), now())&quot;;
+
+  public function save($bookmark) {
+    $rs = $this-&gt;conn-&gt;execute(self::INSERT_SQL,
+                               array($bookmark-&gt;getUrl(),
+
+    $bookmark-&gt;getName(),
+    $bookmark-&gt;getDesc(),
+    $bookmark-&gt;getGroup()));
+  }
+}
+</pre>
+
+<p class="docText">一个类常量保存了用来执行插入操作的语句，代码“手动”把 <tt>Bookmark</tt> 类的 accessor 方法映射到 SQL 语句中对应的绑定值。</p>
+
+<p class="docText">一切都还不错，但还需要做两件事：分别是编写用来处理数据库错误的代码，以及设置或修改被数据库初始化或改变的 <tt>$bookmark</tt> 属性的代码。</p>
+
+<pre>
+class BookmarkMapper {
+  //...
+
+  public function save($bookmark) {
+    $rs = $this-&gt;conn-&gt;execute(
+      self::INSERT_SQL,
+      array($bookmark-&gt;getUrl(),
+            $bookmark-&gt;getName(),
+            $bookmark-&gt;getDesc(),
+            $bookmark-&gt;getGroup()));
+
+    <strong>if ($rs) {
+      $inserted = $this-&gt;findById($this-&gt;conn-&gt;Insert_ID());
+
+      //clean up database related fields in parameter instance
+      $bookmark-&gt;setId($inserted-&gt;getId());
+      $bookmark-&gt;setCrtTime($inserted-&gt;getCrtTime());
+      $bookmark-&gt;setModTime($inserted-&gt;getModTime());
+    } else {
+      throw new Exception('DB Error: '.$this-&gt;conn-&gt;errorMsg());
+    }</strong>
+  }
+}
+</pre>
+
+<p class="docText"><tt>findById()</tt> 很快就会显示，但它的目的是查找并返回与给定 <tt>ID</tt> 匹配的 <tt>Bookmark</tt>。本质上，<tt>BookmarkMapper</tt> 用于插入新的 <tt>Bookmark</tt>，从数据库中取出记录，然后基于新的正确值来设置合适的属性。因为 <tt>Bookmark</tt> 实例本身就是参数，而且已经被恰当地修改了，所以不需要返回任何东西。</p>
+
+<p class="docText">我们继续来看 <tt>findById()</tt> 方法的细节。你可以使用与前面 Table Data Gateway 一章相同的 <tt>BaseTestCase</tt>：</p>
+
+<pre>
+class BookmarkMapperTestCase extends BaseTestCase {
+  // ...
+
+  function testFindById() {
+    $mapper = new BookmarkMapper($this-&gt;conn);
+    $this-&gt;addSeveralBookmarks($mapper);
+
+    $this-&gt;assertIsA($bookmark = $mapper-&gt;findById(1),
+                     'Bookmark');
+    $this-&gt;assertEqual(1, $bookmark-&gt;getId());
+  }
+}
+</pre>
+
+<p class="docText">从技术上来说，除非 <tt>findById()</tt> 运行，否则 <tt>addSeveralBookmarks()</tt> 也不会运行(因为代码只出现在 <tt>save()</tt> 方法中)，但我们还是花几分钟来了解一下。</p>
+
+<pre>
+class BookmarkMapper {
+  // ...
+
+  public function findById($id) {
+    $row = $this-&gt;conn-&gt;getRow('select * from bookmark where id = ?',
+                               array((int)$id));
+    if ($row) {
+      <strong>$bookmark = new Bookmark($this);
+
+      foreach ($this-&gt;map as $field) {
+        $setprop = (string)$field-&gt;mutator;
+        $value = $row[(string)$field-&gt;name];
+        if ($setprop &amp;&amp; $value) {
+          call_user_func(array($bookmark, $setprop), $value);
+        }
+      }
+
+      return $bookmark;</strong>
+    } else {
+      return false;
+    }
+  }
+}
+</pre>
+
+<p class="docText">既然映射程序中的每个查找方法都必须把一个数据行转化为一个 <tt>Bookmark</tt> 实例，最好把这个功能提取到一个独立的方法中，命名为 <tt>createBookmarkFromRow()</tt>。</p>
+
+<pre>
+class BookmarkMapper {
+  // ...
+<strong>
+  protected function createBookmarkFromRow($row) {
+    $bookmark = new Bookmark($this);
+
+    foreach ($this-&gt;map as $field) {
+      $setprop = (string)$field-&gt;mutator;
+      $value = $row[(string)$field-&gt;name];
+      if ($setprop &amp;&amp; $value) {
+        call_user_func(array($bookmark, $setprop), $value);
+      }
+    }
+
+    return $bookmark;
+  }</strong>
+}
+</pre>
+
+<p class="docText">通过这个方法，可以把 <tt>findById()</tt> 简化为：</p>
+
+<pre>
+class BookmarkMapper {
+  // ...
+
+  public function findById($id) {
+    $row = $this-&gt;conn-&gt;getRow('select * from bookmark where id = ?',
+                               array((int)$id));
+    if ($row) {
+      <strong>return $this-&gt;createBookmarkFromRow($row);</strong>
+    } else {
+      return false;
+    }
+  }
+}
+</pre>
+
+<p class="docText">所有这些都有些复杂，因此，一个 UML 顺序图可能对理解有所帮助。</p>
+
+<p class="docText"><center><img alt="" id="ch01sec01No.01" src="images/ch16sec03No.01.gif" /></center></p>
+
+<p class="docText">首先，从数据库中取出数据；接着，创建一个 <tt>Bookmark</tt> 类的实例。然后，对于映射中的每个字段，代码找到合适的 setter 方法，并把记录行的值传递给 setter。<tt>Bookmark</tt> 实例，现在已经包含了数据库数据，于是，可以通过 <tt>findById()</tt> 返回了。</p>
+
+<p class="docText">现在，我们来看 <tt>BookmarkMapper::add()</tt> 方法，它被 <tt>BaseTestCase::addSeveralBookmarks()</tt> 所使用。通过一个测试用例，可以验证它在表中创建了一条记录，并且返回一个包含了正确的映射数据的 <tt>Bookmark</tt> 类的实例。</p>
+
+<pre>
+class BookmarkMapperTestCase extends BaseTestCase {
+  // ...
+
+  function testAdd() {
+    $mapper = new BookmarkMapper($this-&gt;conn);
+    $bookmark = $mapper-&gt;add('http://phparch.com',
+                             'php|arch',
+                             'php|architect magazine homepage',
+                             'php');
+    $this-&gt;assertEqual(1, $this-&gt;conn-&gt;getOne('select count(1) from bookmark'));
+    $this-&gt;assertEqual('http://phparch.com', $bookmark-&gt;getUrl());
+    $this-&gt;assertEqual('php|arch', $bookmark-&gt;getName());
+    $this-&gt;assertEqual('php|architect magazine homepage',
+
+    $bookmark-&gt;getDesc());
+    $this-&gt;assertEqual('php', $bookmark-&gt;getGroup());
+  }
+}
+</pre>
+
+<p class="docText">下面就是 <tt>BookmarkMapper</tt> 的相关代码。</p>
+
+<pre>
+class BookmarkMapper {
+  // ...
+
+  public function add($url, $name, $description, $group) {
+    $bookmark = new Bookmark;
+    $bookmark-&gt;setUrl($url);
+    $bookmark-&gt;setName($name);
+    $bookmark-&gt;setDesc($description);
+    $bookmark-&gt;setGroup($group);
+
+    $this-&gt;save($bookmark);
+
+    return $bookmark;
+  }
+}
+</pre>
+
+<p class="docText">这类似于 Active Record 的 <tt>ActiveRecordTestCase::add()</tt> 方法，但是在这里，它已经被增加到映射程序，而不是测试用例，使得它可以在项目代码中使用。</p>
+
+<p class="docText">现在，你可以继续实现其它查找方法，包括返回 <tt>Bookmark </tt>实例集合的方法。</p>
+
+<pre>
+class BookmarkMapperTestCase extends BaseTestCase {
+  // ...
+
+  function testFindByGroup() {
+    $mapper = new BookmarkMapper($this-&gt;conn);
+    $this-&gt;addSeveralBookmarks($mapper);
+
+    $this-&gt;assertIsA($php_links = $mapper-&gt;findByGroup('php'),
+                     'array');
+    $this-&gt;assertEqual(3, count($php_links));
+
+    foreach ($php_links as $link) {
+      $this-&gt;assertIsA($link, 'Bookmark');
+    }
+  }
+}
+</pre>
+
+<p class="docText">查找一个具体分类中的所有 <tt>bookmarks</tt> 可以实现为：</p>
+
+<pre>
+class BookmarkMapper {
+  // ...
+
+  public function findByGroup($group) {
+    $rs = $this-&gt;conn-&gt;execute('select * from bookmark where tag like ?',
+                               array($group.'%'));
+    if ($rs) {
+      $ret = array();
+      <strong>foreach ($rs-&gt;getArray() as $row) {
+        $ret[] = $this-&gt;createBookmarkFromRow($row);
+      }</strong>
+
+      return $ret;
+    }
+  }
+}
+</pre>
+
+<p class="docText"><tt>ADOConnection::execute()</tt> 方法返回一个 <tt>ADOResultSet</tt> 对象。这个结果集包含一个 <tt>getArray()</tt> 方法，用于为每个数据行返回一个联合数组(<tt>field =&gt; value</tt>)。然后，这些数据行数组依次传递给 <tt>createBookmarkFromRow()</tt> 方法来创建 <tt>Bookmark</tt> 类的实例。</p>
+
+<p class="docText">如何在映射程序中进行更新呢？更新操作同样是 <tt>Bookmark</tt> 和 <tt>BookmarkMapper</tt> 之间的协作。确保 <tt>bookmark</tt>  确实有没有更新最好的方法是用 <tt>BookmarkTestCase</tt>。而数据库的往返测试则由 <tt>BookmarkMapper</tt> 的测试负责。</p>
+
+<pre>
+class BookmarkTestCase extends BaseTestCase {
+  // ...
+
+  function testSaveUpdatesDatabase() {
+    $mapper = new BookmarkMapper($this-&gt;conn);
+    $this-&gt;addSeveralBookmarks($mapper);
+
+    $bookmark = $mapper-&gt;findById(1);
+    $this-&gt;assertEqual('http://blog.casey-sweat.us/',
+                       $bookmark-&gt;getUrl());
+
+    $bookmark-&gt;setUrl('http://blog.casey-sweat.us/wp-rss2.php');
+                      $mapper-&gt;save($bookmark);
+    $bookmark2 = $mapper-&gt;findById(1);
+
+    $this-&gt;assertEqual('http://blog.casey-sweat.us/wp-rss2.php',
+    $bookmark2-&gt;getUrl());
+  }
+}
+</pre>
+
+<p class="docText">当前，<tt>save()</tt> 方法通过 <tt>INSERT</tt> 把新的 <tt>bookmark</tt> 插入到数据库中。然而，正如这个测试实例所暗示的，<tt>save()</tt> 现在必须确定 <tt>Bookmark</tt> 参数是新的还是之前就已经添加到数据库的。对于前者，<tt>INSERT </tt>就可以了；而对于后者，就需要使用 <tt>UPDATE</tt> 了。</p>
+
+<p class="docText">就目前的情况，我们重构执行 <tt>INSERT</tt> 语句的代码，它们位于 <tt>save()</tt> 方法中，把它们移到一个新的叫做 <tt>insert()</tt> 的 <tt>protected</tt> 方法中。</p>
+
+<pre>
+class BookmarkMapper {
+  //...
+
+  <strong>protected function insert($bookmark) {</strong>
+    $rs = $this-&gt;conn-&gt;execute(self::INSERT_SQL,
+                               array($bookmark-&gt;getUrl(),
+                               $bookmark-&gt;getName(),
+                               $bookmark-&gt;getDesc(),
+                               $bookmark-&gt;getGroup()));
+    if ($rs) {
+      $inserted = $this-&gt;findById($this-&gt;conn-&gt;Insert_ID());
+      // clean up database related fields in parameter instance
+      if (method_exists($inserted, 'setId')) {
+        $bookmark-&gt;setId($inserted-&gt;getId());
+        $bookmark-&gt;setCrtTime($inserted-&gt;getCrtTime());
+        $bookmark-&gt;setModTime($inserted-&gt;getModTime());
+      }
+    } else {
+      throw new Exception('DB Error: '.$this-&gt;conn-&gt;errorMsg());
+    }
+  }
+}
+</pre>
+
+<p class="docText">把现有的 <tt>save()</tt> 方法重命名为 <tt>insert()</tt> 的同时，<tt>save()</tt> 方法(还需要编写)必须使用 <tt>getId()</tt> 检查 <tt>$id</tt> 属性是否已经被设置了：</p>
+
+<pre>
+class BookmarkMapper {
+  //...
+
+  public function save($bookmark) {
+    if ($bookmark-&gt;getId()) {
+      $this-&gt;update($bookmark);
+    } else {
+      $this-&gt;insert($bookmark);
+    }
+  }
+}
+</pre>
+
+<p class="docText">现在，你需要一个与 <tt>insert()</tt> 方法类似的 <tt>update()</tt> 方法。如果你回想一下，<tt>insert()</tt> 方法硬编码了属性到字段名的映射。对于 <tt>update()</tt>，我们使用一个更加动态的方法，使用来自 <span class="docEmphasis">bookmark.xml</span> 映射文件的信息。</p>
+
+<pre>
+class BookmarkMapper {
+  //...
+
+  const UPDATE_SQL = &quot;update bookmark set url = ?,
+                                          name = ?,
+                                          description = ?,
+                                          tag = ?,
+                                          updated = now() where id = ?&quot;;
+
+  protected function update($bookmark) {
+    <strong>$binds = array();
+    foreach (array('url', 'name', 'description', 'tag', 'id') as $fieldname) {
+      $field = $this-&gt;map[$fieldname];
+      $getprop = (string)$field-&gt;accessor;
+      $binds[] = $bookmark-&gt;$getprop();
+    }</strong>
+    $this-&gt;conn-&gt;execute(self::UPDATE_SQL, $binds);
+  }
+}
+</pre>
+
+<p class="docText">注意，数组中元素的顺序与我们的 <tt>SQL</tt> 语句中所需的顺序是一致的。<tt>update()</tt> 方法反映了 Data Mapper 的本质。它在属性和字段之间建立了一种联系。</p>
+
+<p class="docText">最后，我们来看“删除”(delete) CRUD 功能的实现。我们为 <tt>BookmarkMapper</tt> 类编写一个方法，它接受一个 <tt>Bookmark</tt> 并把它从数据库中删除。</p>
+
+<p class="docText">首先是一个测试：</p>
+
+<pre>
+class BookmarkMapperTestCase extends BaseTestCase {
+  // ...
+
+  function testDelete() {
+    $mapper = new BookmarkMapper($this-&gt;conn);
+    $this-&gt;addSeveralBookmarks($mapper);
+
+    $this-&gt;assertEqual(5, $this-&gt;countBookmarks());
+
+    $delete_me = $mapper-&gt;findById(3);
+    $mapper-&gt;delete($delete_me);
+
+    $this-&gt;assertEqual(4, $this-&gt;countBookmarks());
+  }
+
+  function countBookmarks() {
+    return $this-&gt;conn-&gt;getOne('select count(1) from bookmark');
+  }
+}
+</pre>
+
+<p class="docText">然后是代码：</p>
+
+<pre>
+class BookmarkMapper {
+  // ...
+<strong>
+  public function delete($bookmark) {
+    $this-&gt;conn-&gt;execute('delete from bookmark where id = ?',
+                         array((int)$bookmark-&gt;getId()));
+  }</strong>
+}
+</pre>
+
+<p class="docText">现在，你已经为 <tt>bookmark</tt> 表实现了一个包含了完整的 CRUD 功能的 Data Mapper 模式。</p>
+
+<p class="docText">如果领域对象的创建开销很大，那么你可能需要编写一个 <tt>BookmarkMapper::deleteById()</tt> 方法，它不需要加载领域对象就可以删除记录。</p>
+
+
+<h3 class="docSection1Title">小结</h3>
+
+<p class="docText">毫无疑问，在数据库结构和领域对象之间添加一个交换层增加了一定的复杂性。然而，这个复杂性可以为你的代码带来巨大的灵活性，因为你可以不管数据表结构而自由地升级你的类。</p>
+
+<p class="docText">另外，你也应该记住，所有这些还只是非常简单的交换机制，如果你想改进这种机制，用于处理领域模型中的表和与之相应的关系，那么你正在向 ORM —— Object Relational Mapping 迈进 —— 它可不是轻易可以涉足的哟。</p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0" align="center">
+  <tr> 
+    <td align="center"><br>
+      Copyright@<A HREF="http://www.mycodes.net">源码之家</a>(MyCodes.Net) all rights reserved 2002-2010
+    </td>
+  </tr>
+</table>
+</body>
+</html>
